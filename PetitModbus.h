@@ -8,7 +8,7 @@
 #ifndef __PETITMODBUS__H
 #define __PETITMODBUS__H
 
-#define NUMBER_OF_OUTPUT_PETITREGISTERS                 10                      // Petit Modbus RTU Slave Output Register Number
+#define NUMBER_OF_OUTPUT_PETITREGISTERS                 2                      // Petit Modbus RTU Slave Output Register Number
                                                                                 // Have to put a number of registers here
                                                                                 // It has to be bigger than 0 (zero)!!
 #define PETITMODBUS_TIMEOUTTIMER                        250                     // Timeout Constant for Petit Modbus RTU Slave [millisecond]
@@ -33,8 +33,16 @@ typedef struct{
 extern PetitRegStructure    PetitRegisters[NUMBER_OF_OUTPUT_PETITREGISTERS];
 extern volatile unsigned short PetitModbusTimerValue;
 
+typedef enum
+{
+    PETIT_RXTX_IDLE,
+	PETIT_RXTX_TX,
+    PETIT_RXTX_START,
+    PETIT_RXTX_DATABUF,
+    PETIT_RXTX_TIMEOUT
+}PETIT_RXTX_STATE;
+
 // Main Functions
-extern void             InitPetitModbus(unsigned char PetitModbusSlaveAddress);
 extern void             ProcessPetitModbus(void);
 
 // Petit Modbus Port Header
