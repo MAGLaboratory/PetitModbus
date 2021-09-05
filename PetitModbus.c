@@ -1,5 +1,5 @@
 #include "PetitModbus.h"
-#include "PetitModbusPort.h"
+#include <SI_EFM8BB1_Register_Enums.h>
 
 /*******************************ModBus Functions*******************************/
 #define PETITMODBUS_READ_COILS                  1
@@ -22,15 +22,6 @@
 
 unsigned char PETITMODBUS_SLAVE_ADDRESS         =1;
 
-typedef enum
-{
-    PETIT_RXTX_IDLE,
-    PETIT_RXTX_START,
-    PETIT_RXTX_DATABUF,
-    PETIT_RXTX_WAIT_ANSWER,
-    PETIT_RXTX_TIMEOUT
-}PETIT_RXTX_STATE;
-
 typedef struct
 {
   unsigned char     Address;
@@ -45,9 +36,14 @@ unsigned int        Petit_Tx_Current              = 0;
 unsigned int        Petit_Tx_CRC16                = 0xFFFF;
 PETIT_RXTX_STATE    Petit_Tx_State                = PETIT_RXTX_IDLE;
 unsigned char       Petit_Tx_Buf[PETITMODBUS_TRANSMIT_BUFFER_SIZE];
-unsigned int        Petit_Tx_Buf_Size             = 0;
+unsigned char*		Petit_Tx_Ptr				  = &Petit_Tx_Buf[0];
+unsigned int		Petit_Tx_Buf_Size		      = 0;
 
 PETIT_RXTX_DATA     Petit_Rx_Data;
+unsigned char		PetitRxBuffer[PETITMODBUS_RECEIVE_BUFFER_SIZE];
+unsigned char*		Petit_Rx_Ptr				  = &PetitRxBuffer[0];
+unsigned int		PetitRxRemaining 			  = PETITMODBUS_RECEIVE_BUFFER_SIZE;
+unsigned int		PetitRxCounter				  = 0;
 unsigned int        Petit_Rx_CRC16                = 0xFFFF;
 PETIT_RXTX_STATE    Petit_Rx_State                = PETIT_RXTX_IDLE;
 unsigned char       Petit_Rx_Data_Available       = FALSE;
@@ -73,21 +69,6 @@ void Petit_CRC16(const unsigned char Data, unsigned int* CRC)
         else
             *CRC >>= 1;
     }
-}
-
-/******************************************************************************/
-
-/*
- * Function Name        : DoTx
- * @param[out]          : TRUE
- * @How to use          : It is used for send data package over physical layer
- */
-unsigned char Petit_DoSlaveTX(void)
-{  
-    PetitModBus_UART_String(Petit_Tx_Buf,Petit_Tx_Buf_Size);
-
-    Petit_Tx_Buf_Size = 0;
-    return TRUE;
 }
 
 /******************************************************************************/
@@ -283,7 +264,9 @@ unsigned char Petit_CheckRxTimeout(void)
     if (PetitModbusTimerValue>= PETITMODBUS_TIMEOUTTIMER)
     {
         PetitModbusTimerValue   =0;
-        PetitReceiveCounter     =0;
+        PetitRxCounter     =0;
+        PetitRxRemaining = PETITMODBUS_RECEIVE_BUFFER_SIZE;
+        Petit_Rx_Ptr			=&PetitRxBuffer[0];
         return TRUE;
     }
 
@@ -303,34 +286,42 @@ unsigned char CheckPetitModbusBufferComplete(void)
 {
     int PetitExpectedReceiveCount=0;
 
-    if(PetitReceiveCounter>4)
+    if(PetitRxCounter>4)
     {
-        if(PetitReceiveBuffer[0]==PETITMODBUS_SLAVE_ADDRESS)
+        if(PetitRxBuffer[0]==PETITMODBUS_SLAVE_ADDRESS)
         {
-            if(PetitReceiveBuffer[1]==0x01 || PetitReceiveBuffer[1]==0x02 || PetitReceiveBuffer[1]==0x03 || PetitReceiveBuffer[1]==0x04 || PetitReceiveBuffer[1]==0x05 || PetitReceiveBuffer[1]==0x06)  // RHR
+            if(PetitRxBuffer[1]==0x01 || PetitRxBuffer[1]==0x02 || PetitRxBuffer[1]==0x03 || PetitRxBuffer[1]==0x04 || PetitRxBuffer[1]==0x05 || PetitRxBuffer[1]==0x06)  // RHR
             {
                 PetitExpectedReceiveCount    =8;
             }
-            else if(PetitReceiveBuffer[1]==0x0F || PetitReceiveBuffer[1]==0x10)
+            else if(PetitRxBuffer[1]==0x0F || PetitRxBuffer[1]==0x10)
             {
-                PetitExpectedReceiveCount=PetitReceiveBuffer[6]+9;
+                PetitExpectedReceiveCount=PetitRxBuffer[6]+9;
+                if (PetitExpectedReceiveCount > PETITMODBUS_RECEIVE_BUFFER_SIZE)
+                {
+                	PetitRxCounter = 0;
+                	PetitRxRemaining = PETITMODBUS_RECEIVE_BUFFER_SIZE;
+                	return PETIT_FALSE_FUNCTION;
+                }
             }
             else
             {
-                PetitReceiveCounter=0;
+                PetitRxCounter=0;
+                PetitRxRemaining = PETITMODBUS_RECEIVE_BUFFER_SIZE;
                 return PETIT_FALSE_FUNCTION;
             }
         }
         else
         {
-            PetitReceiveCounter=0;
+            PetitRxCounter=0;
+            PetitRxRemaining = PETITMODBUS_RECEIVE_BUFFER_SIZE;
             return PETIT_FALSE_SLAVE_ADDRESS;
         }
     }
     else
         return PETIT_DATA_NOT_READY;
 
-    if(PetitReceiveCounter==PetitExpectedReceiveCount)
+    if(PetitRxCounter==PetitExpectedReceiveCount)
     {
         return PETIT_DATA_READY;
     }
@@ -353,20 +344,21 @@ void Petit_RxRTU(void)
 
     if(Petit_ReceiveBufferControl==PETIT_DATA_READY)
     {
-        Petit_Rx_Data.Address               =PetitReceiveBuffer[0];
+        Petit_Rx_Data.Address               =PetitRxBuffer[0];
         Petit_Rx_CRC16                      = 0xffff;
         Petit_CRC16(Petit_Rx_Data.Address, &Petit_Rx_CRC16);
-        Petit_Rx_Data.Function              =PetitReceiveBuffer[1];
+        Petit_Rx_Data.Function              =PetitRxBuffer[1];
         Petit_CRC16(Petit_Rx_Data.Function, &Petit_Rx_CRC16);
 
         Petit_Rx_Data.DataLen=0;
 
-        for(Petit_i=2;Petit_i<PetitReceiveCounter;Petit_i++)
-            Petit_Rx_Data.DataBuf[Petit_Rx_Data.DataLen++]=PetitReceiveBuffer[Petit_i];
+        for(Petit_i=2;Petit_i<PetitRxCounter;Petit_i++)
+            Petit_Rx_Data.DataBuf[Petit_Rx_Data.DataLen++]=PetitRxBuffer[Petit_i];
 
         Petit_Rx_State =PETIT_RXTX_DATABUF;
 
-        PetitReceiveCounter=0;
+        PetitRxCounter=0;
+        PetitRxRemaining = PETITMODBUS_RECEIVE_BUFFER_SIZE;
     }
 
     Petit_CheckRxTimeout();
@@ -384,6 +376,7 @@ void Petit_RxRTU(void)
         {
             // Valid message!
             Petit_Rx_Data_Available = TRUE;
+            PetitModbusTimerValue   = 0;
         }
 
         Petit_Rx_State = PETIT_RXTX_IDLE;
@@ -414,9 +407,13 @@ void Petit_TxRTU(void)
     Petit_Tx_Buf[Petit_Tx_Buf_Size++] = Petit_Tx_CRC16 & 0x00FF;
     Petit_Tx_Buf[Petit_Tx_Buf_Size++] =(Petit_Tx_CRC16 & 0xFF00) >> 8;
 
-    Petit_DoSlaveTX();
+    Petit_Tx_Ptr = &(Petit_Tx_Buf[0]);
 
-    Petit_Tx_State    =PETIT_RXTX_IDLE;
+    // print first character to start UART peripheral
+	SBUF0 = *Petit_Tx_Ptr++;
+	Petit_Tx_Buf_Size--;
+
+    Petit_Tx_State    =PETIT_RXTX_TX;
 }
 
 /******************************************************************************/
@@ -427,7 +424,7 @@ void Petit_TxRTU(void)
  */
 void ProcessPetitModbus(void)
 {
-    if (Petit_Tx_State != PETIT_RXTX_IDLE)                                      // If answer is ready, send it!
+    if (Petit_Tx_State != PETIT_RXTX_START)                                      // If answer is ready, send it!
         Petit_TxRTU();
 
     Petit_RxRTU();                                                              // Call this function every cycle
@@ -453,18 +450,3 @@ void ProcessPetitModbus(void)
     }
 }
 
-/******************************************************************************/
-
-/*
- * Function Name        : InitPetitModbus
- * @How to use          : Petite ModBus slave initialize
- */
-void InitPetitModbus(unsigned char PetitModbusSlaveAddress)
-{
-    PETITMODBUS_SLAVE_ADDRESS    =PetitModbusSlaveAddress;
-    
-    PetitModBus_UART_Initialise();
-    PetitModBus_TIMER_Initialise();
-}
-
-/******************************************************************************/
