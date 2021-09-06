@@ -260,13 +260,17 @@ unsigned char Petit_RxDataAvailable(void)
  */
 unsigned char Petit_CheckRxTimeout(void)
 {
+	char ea_save;
     // A return value of true indicates there is a timeout    
-    if (PetitModbusTimerValue>= PETITMODBUS_TIMEOUTTIMER)
+    if (++PetitModbusTimerValue>= PETITMODBUS_TIMEOUTTIMER)
     {
+    	ea_save = IE_EA;
+    	IE_EA = 0;
         PetitModbusTimerValue   =0;
         PetitRxCounter     =0;
         PetitRxRemaining = PETITMODBUS_RECEIVE_BUFFER_SIZE;
         Petit_Rx_Ptr			=&PetitRxBuffer[0];
+        IE_EA = ea_save;
         return TRUE;
     }
 
@@ -285,6 +289,7 @@ unsigned char Petit_CheckRxTimeout(void)
 unsigned char CheckPetitModbusBufferComplete(void)
 {
     int PetitExpectedReceiveCount=0;
+    unsigned char ea_save;
 
     if(PetitRxCounter>4)
     {
@@ -299,22 +304,34 @@ unsigned char CheckPetitModbusBufferComplete(void)
                 PetitExpectedReceiveCount=PetitRxBuffer[6]+9;
                 if (PetitExpectedReceiveCount > PETITMODBUS_RECEIVE_BUFFER_SIZE)
                 {
+                	ea_save = IE_EA;
+                	IE_EA = 0;
                 	PetitRxCounter = 0;
                 	PetitRxRemaining = PETITMODBUS_RECEIVE_BUFFER_SIZE;
+                    Petit_Rx_Ptr = &(PetitRxBuffer[0]);
+                    IE_EA = ea_save;
                 	return PETIT_FALSE_FUNCTION;
                 }
             }
             else
             {
+            	ea_save = IE_EA;
+            	IE_EA = 0;
                 PetitRxCounter=0;
                 PetitRxRemaining = PETITMODBUS_RECEIVE_BUFFER_SIZE;
+                Petit_Rx_Ptr = &(PetitRxBuffer[0]);
+                IE_EA = ea_save;
                 return PETIT_FALSE_FUNCTION;
             }
         }
         else
         {
+        	ea_save = IE_EA;
+        	IE_EA = 0;
             PetitRxCounter=0;
             PetitRxRemaining = PETITMODBUS_RECEIVE_BUFFER_SIZE;
+            Petit_Rx_Ptr = &(PetitRxBuffer[0]);
+            IE_EA = ea_save;
             return PETIT_FALSE_SLAVE_ADDRESS;
         }
     }
@@ -339,6 +356,7 @@ void Petit_RxRTU(void)
 {
     unsigned char   Petit_i;
     unsigned char   Petit_ReceiveBufferControl=0;
+    unsigned char 	ea_save;
 
     Petit_ReceiveBufferControl    =CheckPetitModbusBufferComplete();
 
@@ -357,8 +375,12 @@ void Petit_RxRTU(void)
 
         Petit_Rx_State =PETIT_RXTX_DATABUF;
 
+        ea_save = IE_EA;                // Preserve IE_EA
+        IE_EA = 0;
         PetitRxCounter=0;
         PetitRxRemaining = PETITMODBUS_RECEIVE_BUFFER_SIZE;
+        Petit_Rx_Ptr = &(PetitRxBuffer[0]);
+        IE_EA = ea_save;
     }
 
     Petit_CheckRxTimeout();
@@ -376,7 +398,6 @@ void Petit_RxRTU(void)
         {
             // Valid message!
             Petit_Rx_Data_Available = TRUE;
-            PetitModbusTimerValue   = 0;
         }
 
         Petit_Rx_State = PETIT_RXTX_IDLE;
@@ -424,8 +445,11 @@ void Petit_TxRTU(void)
  */
 void ProcessPetitModbus(void)
 {
-    if (Petit_Tx_State != PETIT_RXTX_START)                                      // If answer is ready, send it!
+    if (Petit_Tx_State == PETIT_RXTX_START)                                      // If answer is ready, send it!
+    {
         Petit_TxRTU();
+        return;
+    }
 
     Petit_RxRTU();                                                              // Call this function every cycle
 
