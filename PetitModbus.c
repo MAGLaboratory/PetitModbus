@@ -48,7 +48,8 @@ unsigned int        Petit_Rx_CRC16                = 0xFFFF;
 PETIT_RXTX_STATE    Petit_Rx_State                = PETIT_RXTX_IDLE;
 unsigned char       Petit_Rx_Data_Available       = FALSE;
 
-volatile unsigned short PetitModbusTimerValue         = 0;
+uint8_t PetitExpectedReceiveCount=0;
+
 /****************End of Slave Transmit and Receive Variables*******************/
 
 /*
@@ -116,7 +117,7 @@ void HandlePetitModbusReadHoldingRegisters(void)
 {
     // Holding registers are effectively numerical outputs that can be written to by the host.
     // They can be control registers or analogue outputs.
-    // We potientially have one - the pwm output value
+    // We potentially have one - the pwm output value
     unsigned int    Petit_StartAddress        = 0;
     unsigned int    Petit_NumberOfRegisters   = 0;
     unsigned int    Petit_i                   = 0;
@@ -254,32 +255,6 @@ unsigned char Petit_RxDataAvailable(void)
 /******************************************************************************/
 
 /*
- * Function Name        : CheckRxTimeout
- * @return              : If Time is out return TRUE
- *                        If Time is not out return FALSE
- */
-unsigned char Petit_CheckRxTimeout(void)
-{
-	char ea_save;
-    // A return value of true indicates there is a timeout    
-    if (++PetitModbusTimerValue>= PETITMODBUS_TIMEOUTTIMER)
-    {
-    	ea_save = IE_EA;
-    	IE_EA = 0;
-        PetitModbusTimerValue   =0;
-        PetitRxCounter     =0;
-        PetitRxRemaining = PETITMODBUS_RECEIVE_BUFFER_SIZE;
-        Petit_Rx_Ptr			=&PetitRxBuffer[0];
-        IE_EA = ea_save;
-        return TRUE;
-    }
-
-    return FALSE;
-}
-
-/******************************************************************************/
-
-/*
  * Function Name        : CheckBufferComplete
  * @return              : If data is ready, return              DATA_READY
  *                        If slave address is wrong, return     FALSE_SLAVE_ADDRESS
@@ -288,62 +263,44 @@ unsigned char Petit_CheckRxTimeout(void)
  */
 unsigned char CheckPetitModbusBufferComplete(void)
 {
-    int PetitExpectedReceiveCount=0;
-    unsigned char ea_save;
+	if (!PetitExpectedReceiveCount)
+	{
+		if (PetitRxCounter > 5)
+		{
+			if (PetitRxBuffer[1] >= 0x01 && PetitRxBuffer[1] <= 0x06)  // RHR
+			{
+				PetitExpectedReceiveCount = 8;
+			}
+			else if (PetitRxBuffer[1] == 0x0F || PetitRxBuffer[1] == 0x10)
+			{
+				PetitExpectedReceiveCount = PetitRxBuffer[6] + 9;
+				if (PetitExpectedReceiveCount > PETITMODBUS_RECEIVE_BUFFER_SIZE)
+				{
+					PetitRxCounter = 0;
+					PetitRxRemaining = PETITMODBUS_RECEIVE_BUFFER_SIZE;
+					Petit_Rx_Ptr = &(PetitRxBuffer[0]);
+					PetitExpectedReceiveCount = 0;
+					return PETIT_FALSE_FUNCTION;
+				}
+			}
+			else
+			{
+				PetitRxCounter = 0;
+				PetitRxRemaining = PETITMODBUS_RECEIVE_BUFFER_SIZE;
+				Petit_Rx_Ptr = &(PetitRxBuffer[0]);
+				PetitExpectedReceiveCount = 0;
+				return PETIT_FALSE_FUNCTION;
+			}
+		}
 
-    if(PetitRxCounter>4)
-    {
-        if(PetitRxBuffer[0]==PETITMODBUS_SLAVE_ADDRESS)
-        {
-            if(PetitRxBuffer[1]==0x01 || PetitRxBuffer[1]==0x02 || PetitRxBuffer[1]==0x03 || PetitRxBuffer[1]==0x04 || PetitRxBuffer[1]==0x05 || PetitRxBuffer[1]==0x06)  // RHR
-            {
-                PetitExpectedReceiveCount    =8;
-            }
-            else if(PetitRxBuffer[1]==0x0F || PetitRxBuffer[1]==0x10)
-            {
-                PetitExpectedReceiveCount=PetitRxBuffer[6]+9;
-                if (PetitExpectedReceiveCount > PETITMODBUS_RECEIVE_BUFFER_SIZE)
-                {
-                	ea_save = IE_EA;
-                	IE_EA = 0;
-                	PetitRxCounter = 0;
-                	PetitRxRemaining = PETITMODBUS_RECEIVE_BUFFER_SIZE;
-                    Petit_Rx_Ptr = &(PetitRxBuffer[0]);
-                    IE_EA = ea_save;
-                	return PETIT_FALSE_FUNCTION;
-                }
-            }
-            else
-            {
-            	ea_save = IE_EA;
-            	IE_EA = 0;
-                PetitRxCounter=0;
-                PetitRxRemaining = PETITMODBUS_RECEIVE_BUFFER_SIZE;
-                Petit_Rx_Ptr = &(PetitRxBuffer[0]);
-                IE_EA = ea_save;
-                return PETIT_FALSE_FUNCTION;
-            }
-        }
-        else
-        {
-        	ea_save = IE_EA;
-        	IE_EA = 0;
-            PetitRxCounter=0;
-            PetitRxRemaining = PETITMODBUS_RECEIVE_BUFFER_SIZE;
-            Petit_Rx_Ptr = &(PetitRxBuffer[0]);
-            IE_EA = ea_save;
-            return PETIT_FALSE_SLAVE_ADDRESS;
-        }
-    }
-    else
-        return PETIT_DATA_NOT_READY;
+	}
 
-    if(PetitRxCounter==PetitExpectedReceiveCount)
-    {
-        return PETIT_DATA_READY;
-    }
+	if (PetitExpectedReceiveCount && PetitRxCounter >= PetitExpectedReceiveCount)
+	{
+		return PETIT_DATA_READY;
+	}
 
-    return PETIT_DATA_NOT_READY;
+	return PETIT_DATA_NOT_READY;
 }
 
 /******************************************************************************/
@@ -355,35 +312,40 @@ unsigned char CheckPetitModbusBufferComplete(void)
 void Petit_RxRTU(void)
 {
     unsigned char   Petit_i;
+    unsigned char	Petit_j;
+    unsigned char	Petit_k;
     unsigned char   Petit_ReceiveBufferControl=0;
-    unsigned char 	ea_save;
-
+    unsigned char 	ea_save = IE_EA;                // Preserve IE_EA
+    IE_EA = 0;
     Petit_ReceiveBufferControl    =CheckPetitModbusBufferComplete();
 
     if(Petit_ReceiveBufferControl==PETIT_DATA_READY)
     {
+        // move to internal datastructure
         Petit_Rx_Data.Address               =PetitRxBuffer[0];
-        Petit_Rx_CRC16                      = 0xffff;
-        Petit_CRC16(Petit_Rx_Data.Address, &Petit_Rx_CRC16);
+        CRC0CN0 |= CRC0CN0_CRCVAL__SET_ONES;
+        CRC0CN0 |= CRC0CN0_CRCINIT__INIT;
+        CRC0FLIP = Petit_Rx_Data.Address;
+        CRC0IN = CRC0FLIP;
         Petit_Rx_Data.Function              =PetitRxBuffer[1];
-        Petit_CRC16(Petit_Rx_Data.Function, &Petit_Rx_CRC16);
+        CRC0FLIP = Petit_Rx_Data.Function;
+        CRC0IN = CRC0FLIP;
 
         Petit_Rx_Data.DataLen=0;
 
-        for(Petit_i=2;Petit_i<PetitRxCounter;Petit_i++)
+        for(Petit_i=2;Petit_i<PetitExpectedReceiveCount;Petit_i++)
             Petit_Rx_Data.DataBuf[Petit_Rx_Data.DataLen++]=PetitRxBuffer[Petit_i];
 
         Petit_Rx_State =PETIT_RXTX_DATABUF;
 
-        ea_save = IE_EA;                // Preserve IE_EA
-        IE_EA = 0;
         PetitRxCounter=0;
         PetitRxRemaining = PETITMODBUS_RECEIVE_BUFFER_SIZE;
         Petit_Rx_Ptr = &(PetitRxBuffer[0]);
-        IE_EA = ea_save;
+        PetitExpectedReceiveCount = 0;
     }
 
-    Petit_CheckRxTimeout();
+
+    IE_EA = ea_save;
 
     if ((Petit_Rx_State == PETIT_RXTX_DATABUF) && (Petit_Rx_Data.DataLen >= 2))
     {
@@ -391,9 +353,24 @@ void Petit_RxRTU(void)
         Petit_Rx_Data.DataLen -= 2;
         for (Petit_i = 0; Petit_i < Petit_Rx_Data.DataLen; ++Petit_i)
         {
-            Petit_CRC16(Petit_Rx_Data.DataBuf[Petit_i], &Petit_Rx_CRC16);
+        	CRC0FLIP = Petit_Rx_Data.DataBuf[Petit_i];
+        	CRC0IN = CRC0FLIP;
         }
         
+        // allow LSB read
+        CRC0CN0 &= ~CRC0CN0_CRCPNT__BMASK;
+        Petit_Rx_CRC16 = CRC0DAT;
+        Petit_Rx_CRC16 |= (unsigned int)CRC0DAT << 8;
+        // flip
+        CRC0FLIP = Petit_Rx_CRC16 & 0xF;
+        Petit_i = CRC0FLIP;
+        Petit_Rx_CRC16 >>= 4;
+        CRC0FLIP = Petit_Rx_CRC16 & 0xFF;
+        Petit_j = CRC0FLIP;
+        Petit_Rx_CRC16 >>= 4;
+        CRC0FLIP = Petit_Rx_CRC16 & 0xF0;
+        Petit_k = CRC0FLIP;
+        Petit_Rx_CRC16 = (uint16_t)Petit_i << 8 | (uint16_t)Petit_j << 4 | Petit_k;
         if (((unsigned int) Petit_Rx_Data.DataBuf[Petit_Rx_Data.DataLen] + ((unsigned int) Petit_Rx_Data.DataBuf[Petit_Rx_Data.DataLen + 1] << 8)) == Petit_Rx_CRC16)
         {
             // Valid message!
@@ -412,21 +389,43 @@ void Petit_RxRTU(void)
  */
 void Petit_TxRTU(void)
 {
-    Petit_Tx_CRC16                =0xFFFF;
+	unsigned char Petit_i;
+	unsigned char Petit_j;
+	unsigned char Petit_k;
     Petit_Tx_Buf_Size             =0;
     Petit_Tx_Buf[Petit_Tx_Buf_Size++]   =Petit_Tx_Data.Address;
-    Petit_CRC16(Petit_Tx_Data.Address, &Petit_Tx_CRC16);
+    CRC0CN0 |= CRC0CN0_CRCVAL__SET_ONES;
+    CRC0CN0 |= CRC0CN0_CRCINIT__INIT;
+    CRC0FLIP = Petit_Tx_Data.Address;
+    CRC0IN = CRC0FLIP;
     Petit_Tx_Buf[Petit_Tx_Buf_Size++]   =Petit_Tx_Data.Function;
-    Petit_CRC16(Petit_Tx_Data.Function, &Petit_Tx_CRC16);
+    CRC0FLIP = Petit_Tx_Data.Function;
+    CRC0IN = CRC0FLIP;
 
     for(Petit_Tx_Current=0; Petit_Tx_Current < Petit_Tx_Data.DataLen; Petit_Tx_Current++)
     {
         Petit_Tx_Buf[Petit_Tx_Buf_Size++]=Petit_Tx_Data.DataBuf[Petit_Tx_Current];
-        Petit_CRC16(Petit_Tx_Data.DataBuf[Petit_Tx_Current], &Petit_Tx_CRC16);
+        CRC0FLIP = Petit_Tx_Data.DataBuf[Petit_Tx_Current];
+        CRC0IN = CRC0FLIP;
     }
-    
-    Petit_Tx_Buf[Petit_Tx_Buf_Size++] = Petit_Tx_CRC16 & 0x00FF;
-    Petit_Tx_Buf[Petit_Tx_Buf_Size++] =(Petit_Tx_CRC16 & 0xFF00) >> 8;
+
+    CRC0CN0 &= ~CRC0CN0_CRCPNT__BMASK;
+    Petit_Tx_CRC16 = CRC0DAT;
+    Petit_Tx_CRC16 |= (unsigned int)CRC0DAT << 8;
+
+    // flip
+    CRC0FLIP = Petit_Tx_CRC16 & 0xF;
+    Petit_i = CRC0FLIP;
+    Petit_Tx_CRC16 >>= 4;
+    CRC0FLIP = Petit_Tx_CRC16 & 0xFF;
+    Petit_j = CRC0FLIP;
+    Petit_Tx_CRC16 >>= 4;
+    CRC0FLIP = Petit_Tx_CRC16 & 0xF0;
+    Petit_k = CRC0FLIP;
+    Petit_Tx_CRC16 = (uint16_t)Petit_i << 8 | (uint16_t)Petit_j << 4 | Petit_k;
+
+    Petit_Tx_Buf[Petit_Tx_Buf_Size++] = Petit_Tx_CRC16;
+    Petit_Tx_Buf[Petit_Tx_Buf_Size++] = Petit_Tx_CRC16 >> 8;
 
     Petit_Tx_Ptr = &(Petit_Tx_Buf[0]);
 
@@ -453,24 +452,41 @@ void ProcessPetitModbus(void)
 
     Petit_RxRTU();                                                              // Call this function every cycle
 
-    if (Petit_RxDataAvailable())                                                // If data is ready enter this!
-    {
-        if (Petit_Rx_Data.Address == PETITMODBUS_SLAVE_ADDRESS)                 // Is Data for us?
-        {
-            switch (Petit_Rx_Data.Function)                                     // Data is for us but which function?
-            {
-                #if PETITMODBUS_READ_HOLDING_REGISTERS_ENABLED > 0
-                case PETITMODBUS_READ_HOLDING_REGISTERS:    {   HandlePetitModbusReadHoldingRegisters();        break;  }
-                #endif
-                #if PETITMODBUSWRITE_SINGLE_REGISTER_ENABLED > 0
-                case PETITMODBUS_WRITE_SINGLE_REGISTER:     {   HandlePetitModbusWriteSingleRegister();         break;  }
-                #endif
-                #if PETITMODBUS_WRITE_MULTIPLE_REGISTERS_ENABLED > 0
-                case PETITMODBUS_WRITE_MULTIPLE_REGISTERS:  {   HandleMPetitodbusWriteMultipleRegisters();      break;  }
-                #endif
-                default:                                    {   HandlePetitModbusError(PETIT_ERROR_CODE_01);    break;  }
-            }
-        }
-    }
+	if (Petit_RxDataAvailable())                 // If data is ready enter this!
+	{
+		if (Petit_Rx_Data.Address == PETITMODBUS_SLAVE_ADDRESS) // Is Data for us?
+		{
+			switch (Petit_Rx_Data.Function)
+			// Data is for us but which function?
+			{
+#if PETITMODBUS_READ_HOLDING_REGISTERS_ENABLED > 0
+			case PETITMODBUS_READ_HOLDING_REGISTERS:
+			{
+				HandlePetitModbusReadHoldingRegisters();
+				break;
+			}
+#endif
+#if PETITMODBUSWRITE_SINGLE_REGISTER_ENABLED > 0
+			case PETITMODBUS_WRITE_SINGLE_REGISTER:
+			{
+				HandlePetitModbusWriteSingleRegister();
+				break;
+			}
+#endif
+#if PETITMODBUS_WRITE_MULTIPLE_REGISTERS_ENABLED > 0
+			case PETITMODBUS_WRITE_MULTIPLE_REGISTERS:
+			{
+				HandleMPetitodbusWriteMultipleRegisters();
+				break;
+			}
+#endif
+			default:
+			{
+				HandlePetitModbusError(PETIT_ERROR_CODE_01);
+				break;
+			}
+			}
+		}
+	}
 }
 
