@@ -31,7 +31,7 @@ typedef struct{
         }PetitRegStructure;
 
 extern PetitRegStructure    PetitRegisters[NUMBER_OF_OUTPUT_PETITREGISTERS];
-extern volatile unsigned short PetitModbusTimerValue;
+extern unsigned char PetitRegChange;
 
 typedef enum
 {
