@@ -26,9 +26,7 @@
 // Variable for Slave Address
 extern unsigned char PETITMODBUS_SLAVE_ADDRESS;                                 // Petit Modbus RTU Slave icin adres numarasi [0 to 255]
 
-typedef struct{
-            short                     ActValue;
-        }PetitRegStructure;
+typedef short PetitRegStructure;
 
 extern PetitRegStructure    PetitRegisters[NUMBER_OF_OUTPUT_PETITREGISTERS];
 extern unsigned char PetitRegChange;
