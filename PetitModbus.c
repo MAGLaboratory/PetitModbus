@@ -139,7 +139,7 @@ void HandlePetitModbusReadHoldingRegisters(void)
 
         for (Petit_i = 0; Petit_i < Petit_NumberOfRegisters; Petit_i++)
         {
-            unsigned short Petit_CurrentData = PetitRegisters[Petit_StartAddress+Petit_i].ActValue;
+            unsigned short Petit_CurrentData = PetitRegisters[Petit_StartAddress+Petit_i];
 
             Petit_Tx_Data.DataBuf[Petit_Tx_Data.DataLen]        = (unsigned char) ((Petit_CurrentData & 0xFF00) >> 8);
             Petit_Tx_Data.DataBuf[Petit_Tx_Data.DataLen + 1]    = (unsigned char) (Petit_CurrentData & 0xFF);
@@ -179,10 +179,12 @@ void HandlePetitModbusWriteSingleRegister(void)
         HandlePetitModbusError(PETIT_ERROR_CODE_02);
     else
     {
-        PetitRegisters[Petit_Address].ActValue=Petit_Value;
+        PetitRegisters[Petit_Address]=Petit_Value;
         // Output data buffer is exact copy of input buffer
         for (Petit_i = 0; Petit_i < 4; ++Petit_i)
             Petit_Tx_Data.DataBuf[Petit_i] = Petit_Rx_Data.DataBuf[Petit_i];
+
+        PetitRegChange = 1;
     }
 
     PetitSendMessage();
@@ -228,8 +230,10 @@ void HandleMPetitodbusWriteMultipleRegisters(void)
         for (Petit_i = 0; Petit_i <Petit_NumberOfRegisters; Petit_i++)
         {
             Petit_Value=(Petit_Rx_Data.DataBuf[5+2*Petit_i]<<8)+(Petit_Rx_Data.DataBuf[6+2*Petit_i]);
-            PetitRegisters[Petit_StartAddress+Petit_i].ActValue=Petit_Value;
+            PetitRegisters[Petit_StartAddress+Petit_i]=Petit_Value;
         }
+
+        PetitRegChange = 1;
 
         PetitSendMessage();
     }
