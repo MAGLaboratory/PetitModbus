@@ -30,6 +30,8 @@ typedef struct
   unsigned short    DataLen;
 }PETIT_RXTX_DATA;
 
+extern code const unsigned short PetitCRCtable[];
+
 /**********************Slave Transmit and Receive Variables********************/
 PETIT_RXTX_DATA     Petit_Tx_Data;
 unsigned int        Petit_Tx_Current              = 0;
@@ -327,13 +329,17 @@ void Petit_RxRTU(void)
     {
         // move to internal datastructure
         Petit_Rx_Data.Address               =PetitRxBuffer[0];
-        CRC0CN0 |= CRC0CN0_CRCVAL__SET_ONES;
-        CRC0CN0 |= CRC0CN0_CRCINIT__INIT;
-        CRC0FLIP = Petit_Rx_Data.Address;
-        CRC0IN = CRC0FLIP;
-        Petit_Rx_Data.Function              =PetitRxBuffer[1];
-        CRC0FLIP = Petit_Rx_Data.Function;
-        CRC0IN = CRC0FLIP;
+        Petit_Rx_CRC16 = 0xFFFF;
+
+		Petit_Rx_CRC16 =
+				(Petit_Rx_CRC16 >> 8)
+						^ PetitCRCtable[(Petit_Rx_CRC16 ^ Petit_Rx_Data.Address)
+								& 0xFF];
+        Petit_Rx_Data.Function =PetitRxBuffer[1];
+		Petit_Rx_CRC16 =
+				(Petit_Rx_CRC16 >> 8)
+						^ PetitCRCtable[(Petit_Rx_CRC16 ^ Petit_Rx_Data.Function)
+								& 0xFF];
 
         Petit_Rx_Data.DataLen=0;
 
@@ -357,24 +363,14 @@ void Petit_RxRTU(void)
         Petit_Rx_Data.DataLen -= 2;
         for (Petit_i = 0; Petit_i < Petit_Rx_Data.DataLen; ++Petit_i)
         {
-        	CRC0FLIP = Petit_Rx_Data.DataBuf[Petit_i];
-        	CRC0IN = CRC0FLIP;
+    		Petit_Rx_CRC16 =
+    				(Petit_Rx_CRC16 >> 8)
+    						^ PetitCRCtable[(Petit_Rx_CRC16 ^
+    								Petit_Rx_Data.DataBuf[Petit_i]) & 0xFF];
         }
         
         // allow LSB read
-        CRC0CN0 &= ~CRC0CN0_CRCPNT__BMASK;
-        Petit_Rx_CRC16 = CRC0DAT;
-        Petit_Rx_CRC16 |= (unsigned int)CRC0DAT << 8;
-        // flip
-        CRC0FLIP = Petit_Rx_CRC16 & 0xF;
-        Petit_i = CRC0FLIP;
-        Petit_Rx_CRC16 >>= 4;
-        CRC0FLIP = Petit_Rx_CRC16 & 0xFF;
-        Petit_j = CRC0FLIP;
-        Petit_Rx_CRC16 >>= 4;
-        CRC0FLIP = Petit_Rx_CRC16 & 0xF0;
-        Petit_k = CRC0FLIP;
-        Petit_Rx_CRC16 = (uint16_t)Petit_i << 8 | (uint16_t)Petit_j << 4 | Petit_k;
+
         if (((unsigned int) Petit_Rx_Data.DataBuf[Petit_Rx_Data.DataLen] + ((unsigned int) Petit_Rx_Data.DataBuf[Petit_Rx_Data.DataLen + 1] << 8)) == Petit_Rx_CRC16)
         {
             // Valid message!
@@ -398,35 +394,23 @@ void Petit_TxRTU(void)
 	unsigned char Petit_k;
     Petit_Tx_Buf_Size             =0;
     Petit_Tx_Buf[Petit_Tx_Buf_Size++]   =Petit_Tx_Data.Address;
-    CRC0CN0 |= CRC0CN0_CRCVAL__SET_ONES;
-    CRC0CN0 |= CRC0CN0_CRCINIT__INIT;
-    CRC0FLIP = Petit_Tx_Data.Address;
-    CRC0IN = CRC0FLIP;
+    Petit_Tx_CRC16 =
+        (Petit_Tx_CRC16 >> 8)
+        		^ PetitCRCtable[(Petit_Tx_CRC16 ^ Petit_Tx_Data.Address)
+        				& 0xFF];
     Petit_Tx_Buf[Petit_Tx_Buf_Size++]   =Petit_Tx_Data.Function;
-    CRC0FLIP = Petit_Tx_Data.Function;
-    CRC0IN = CRC0FLIP;
-
+    Petit_Tx_CRC16 =
+        (Petit_Tx_CRC16 >> 8)
+        		^ PetitCRCtable[(Petit_Tx_CRC16 ^ Petit_Tx_Data.Function)
+        				& 0xFF];
     for(Petit_Tx_Current=0; Petit_Tx_Current < Petit_Tx_Data.DataLen; Petit_Tx_Current++)
     {
         Petit_Tx_Buf[Petit_Tx_Buf_Size++]=Petit_Tx_Data.DataBuf[Petit_Tx_Current];
-        CRC0FLIP = Petit_Tx_Data.DataBuf[Petit_Tx_Current];
-        CRC0IN = CRC0FLIP;
+        Petit_Tx_CRC16 =
+            (Petit_Tx_CRC16 >> 8)
+            		^ PetitCRCtable[(Petit_Tx_CRC16 ^
+            				Petit_Tx_Data.DataBuf[Petit_Tx_Current]) & 0xFF];
     }
-
-    CRC0CN0 &= ~CRC0CN0_CRCPNT__BMASK;
-    Petit_Tx_CRC16 = CRC0DAT;
-    Petit_Tx_CRC16 |= (unsigned int)CRC0DAT << 8;
-
-    // flip
-    CRC0FLIP = Petit_Tx_CRC16 & 0xF;
-    Petit_i = CRC0FLIP;
-    Petit_Tx_CRC16 >>= 4;
-    CRC0FLIP = Petit_Tx_CRC16 & 0xFF;
-    Petit_j = CRC0FLIP;
-    Petit_Tx_CRC16 >>= 4;
-    CRC0FLIP = Petit_Tx_CRC16 & 0xF0;
-    Petit_k = CRC0FLIP;
-    Petit_Tx_CRC16 = (uint16_t)Petit_i << 8 | (uint16_t)Petit_j << 4 | Petit_k;
 
     Petit_Tx_Buf[Petit_Tx_Buf_Size++] = Petit_Tx_CRC16;
     Petit_Tx_Buf[Petit_Tx_Buf_Size++] = Petit_Tx_CRC16 >> 8;
