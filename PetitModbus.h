@@ -8,7 +8,7 @@
 #ifndef __PETITMODBUS__H
 #define __PETITMODBUS__H
 
-#define NUMBER_OF_OUTPUT_PETITREGISTERS                 2                      // Petit Modbus RTU Slave Output Register Number
+#define NUMBER_OF_OUTPUT_PETITREGISTERS                 3                       // Petit Modbus RTU Slave Output Register Number
                                                                                 // Have to put a number of registers here
                                                                                 // It has to be bigger than 0 (zero)!!
 #define PETITMODBUS_TIMEOUTTIMER                        3                       // Timeout Constant for Petit Modbus RTU Slave [millisecond]
