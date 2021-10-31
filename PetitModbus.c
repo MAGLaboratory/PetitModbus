@@ -394,6 +394,7 @@ void Petit_TxRTU(void)
 	unsigned char Petit_k;
     Petit_Tx_Buf_Size             =0;
     Petit_Tx_Buf[Petit_Tx_Buf_Size++]   =Petit_Tx_Data.Address;
+    Petit_Tx_CRC16 = 0xFFFF;
     Petit_Tx_CRC16 =
         (Petit_Tx_CRC16 >> 8)
         		^ PetitCRCtable[(Petit_Tx_CRC16 ^ Petit_Tx_Data.Address)
