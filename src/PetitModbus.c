@@ -425,7 +425,10 @@ void Petit_TxRTU(void)
 
 	Petit_Tx_Ptr = &(Petit_Tx_Buf[0]);
 
-	Petit_Tx_State = PETIT_RXTX_TX;
+	// one cycle for RxRTU()
+	// one cycle for TxRTU()
+	Petit_Tx_Delay = 2;
+	Petit_Tx_State = PETIT_RXTX_TX_BEGIN;
 }
 
 /******************************************************************************/
@@ -443,9 +446,9 @@ void ProcessPetitModbus(void)
 	}
 
 	// process the TX delay
-	if (Petit_Tx_State == PETIT_RXTX_TX)
+	if (Petit_Tx_State == PETIT_RXTX_TX_BEGIN)
 	{
-		if (Petit_Tx_Delay < 2)
+		if (Petit_Tx_Delay < 3)
 		{
 			Petit_Tx_Delay++;
 		}
@@ -455,9 +458,15 @@ void ProcessPetitModbus(void)
 			P0_B3 = true;
 			SBUF0 = *Petit_Tx_Ptr++;
 			Petit_Tx_Buf_Size--;
+			Petit_Tx_State = PETIT_RXTX_TX;
 
 		}
 		return;	
+	}
+
+	if (Petit_Tx_State == PETIT_RXTX_TX)
+	{
+		return;
 	}
 
 	Petit_RxRTU();                             // Call this function every cycle

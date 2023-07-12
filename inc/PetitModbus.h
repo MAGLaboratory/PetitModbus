@@ -34,6 +34,7 @@ extern unsigned char PetitRegChange;
 typedef enum
 {
     PETIT_RXTX_IDLE = 0,
+	PETIT_RXTX_TX_BEGIN,
     PETIT_RXTX_TX,
     PETIT_RXTX_START,
     PETIT_RXTX_DATABUF,
