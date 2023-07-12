@@ -34,6 +34,7 @@ extern code const unsigned short PetitCRCtable[];
 
 /**********************Slave Transmit and Receive Variables********************/
 PETIT_RXTX_DATA Petit_Tx_Data;
+unsigned int Petit_Tx_Delay = 0;
 unsigned int Petit_Tx_Current = 0;
 unsigned int Petit_Tx_CRC16 = 0xFFFF;
 PETIT_RXTX_STATE Petit_Tx_State = PETIT_RXTX_IDLE;
@@ -424,11 +425,6 @@ void Petit_TxRTU(void)
 
 	Petit_Tx_Ptr = &(Petit_Tx_Buf[0]);
 
-	// print first character to start UART peripheral
-	P0_B3 = true;
-	SBUF0 = *Petit_Tx_Ptr++;
-	Petit_Tx_Buf_Size--;
-
 	Petit_Tx_State = PETIT_RXTX_TX;
 }
 
@@ -444,6 +440,24 @@ void ProcessPetitModbus(void)
 	{
 		Petit_TxRTU();
 		return;
+	}
+
+	// process the TX delay
+	if (Petit_Tx_State == PETIT_RXTX_TX)
+	{
+		if (Petit_Tx_Delay < 2)
+		{
+			Petit_Tx_Delay++;
+		}
+		else
+		{
+			// print first character to start UART peripheral
+			P0_B3 = true;
+			SBUF0 = *Petit_Tx_Ptr++;
+			Petit_Tx_Buf_Size--;
+
+		}
+		return;	
 	}
 
 	Petit_RxRTU();                             // Call this function every cycle
