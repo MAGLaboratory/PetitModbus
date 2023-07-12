@@ -33,12 +33,12 @@ extern unsigned char PetitRegChange;
 
 typedef enum
 {
-    PETIT_RXTX_IDLE,
-	PETIT_RXTX_TX,
+    PETIT_RXTX_IDLE = 0,
+    PETIT_RXTX_TX,
     PETIT_RXTX_START,
     PETIT_RXTX_DATABUF,
     PETIT_RXTX_TIMEOUT
-}PETIT_RXTX_STATE;
+}  PETIT_RXTX_STATE;
 
 // Main Functions
 extern void             ProcessPetitModbus(void);
