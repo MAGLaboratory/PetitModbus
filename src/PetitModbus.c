@@ -33,11 +33,12 @@ typedef struct
 extern code const unsigned short PetitCRCtable[];
 
 /**********************Slave Transmit and Receive Variables********************/
+PETIT_RXTX_STATE Petit_RxTx_State = PETIT_RXTX_IDLE;
+
 PETIT_RXTX_DATA Petit_Tx_Data;
 unsigned int Petit_Tx_Delay = 0;
 unsigned int Petit_Tx_Current = 0;
 unsigned int Petit_Tx_CRC16 = 0xFFFF;
-PETIT_RXTX_STATE Petit_Tx_State = PETIT_RXTX_IDLE;
 unsigned char Petit_Tx_Buf[PETITMODBUS_TRANSMIT_BUFFER_SIZE];
 unsigned char *Petit_Tx_Ptr = &Petit_Tx_Buf[0];
 unsigned int Petit_Tx_Buf_Size = 0;
@@ -48,7 +49,6 @@ unsigned char *Petit_Rx_Ptr = &PetitRxBuffer[0];
 unsigned int PetitRxRemaining = PETITMODBUS_RECEIVE_BUFFER_SIZE;
 unsigned int PetitRxCounter = 0;
 unsigned int Petit_Rx_CRC16 = 0xFFFF;
-PETIT_RXTX_STATE Petit_Rx_State = PETIT_RXTX_IDLE;
 unsigned char Petit_Rx_Data_Available = FALSE;
 
 uint8_t PetitExpectedReceiveCount = 0;
@@ -84,11 +84,11 @@ void Petit_CRC16(const unsigned char Data, unsigned int *CRC)
  */
 unsigned char PetitSendMessage(void)
 {
-	if (Petit_Tx_State != PETIT_RXTX_IDLE)
+	if (Petit_RxTx_State != PETIT_RXTX_RXC)
 		return FALSE;
 
 	Petit_Tx_Current = 0;
-	Petit_Tx_State = PETIT_RXTX_START;
+	Petit_RxTx_State = PETIT_RXTX_START;
 
 	return TRUE;
 }
@@ -359,7 +359,7 @@ void Petit_RxRTU(void)
 			Petit_Rx_Data.DataBuf[Petit_Rx_Data.DataLen++] =
 					PetitRxBuffer[Petit_i];
 
-		Petit_Rx_State = PETIT_RXTX_DATABUF;
+		Petit_RxTx_State = PETIT_RXTX_DATABUF;
 
 		PetitRxCounter = 0;
 		PetitRxRemaining = PETITMODBUS_RECEIVE_BUFFER_SIZE;
@@ -369,7 +369,7 @@ void Petit_RxRTU(void)
 
 	IE_EA = ea_save;
 
-	if ((Petit_Rx_State == PETIT_RXTX_DATABUF) && (Petit_Rx_Data.DataLen >= 2))
+	if ((Petit_RxTx_State == PETIT_RXTX_DATABUF) && (Petit_Rx_Data.DataLen >= 2))
 	{
 		// Finish off our CRC check
 		Petit_Rx_Data.DataLen -= 2;
@@ -388,9 +388,12 @@ void Petit_RxRTU(void)
 		{
 			// Valid message!
 			Petit_Rx_Data_Available = TRUE;
+			Petit_RxTx_State = PETIT_RXTX_RXC;
 		}
-
-		Petit_Rx_State = PETIT_RXTX_IDLE;
+		else
+		{
+			Petit_RxTx_State = PETIT_RXTX_IDLE;
+		}
 	}
 }
 
@@ -428,7 +431,7 @@ void Petit_TxRTU(void)
 	// one cycle for RxRTU()
 	// one cycle for TxRTU()
 	Petit_Tx_Delay = 2;
-	Petit_Tx_State = PETIT_RXTX_TX_BEGIN;
+	Petit_RxTx_State = PETIT_RXTX_TX_BEGIN;
 }
 
 /******************************************************************************/
@@ -439,14 +442,14 @@ void Petit_TxRTU(void)
  */
 void ProcessPetitModbus(void)
 {
-	if (Petit_Tx_State == PETIT_RXTX_START)      // If answer is ready, send it!
+	if (Petit_RxTx_State == PETIT_RXTX_START)      // If answer is ready, send it!
 	{
 		Petit_TxRTU();
 		return;
 	}
 
 	// process the TX delay
-	if (Petit_Tx_State == PETIT_RXTX_TX_BEGIN)
+	if (Petit_RxTx_State == PETIT_RXTX_TX_BEGIN)
 	{
 		if (Petit_Tx_Delay < 3)
 		{
@@ -458,13 +461,13 @@ void ProcessPetitModbus(void)
 			P0_B3 = true;
 			SBUF0 = *Petit_Tx_Ptr++;
 			Petit_Tx_Buf_Size--;
-			Petit_Tx_State = PETIT_RXTX_TX;
+			Petit_RxTx_State = PETIT_RXTX_TX;
 
 		}
 		return;	
 	}
 
-	if (Petit_Tx_State == PETIT_RXTX_TX)
+	if (Petit_RxTx_State == PETIT_RXTX_TX)
 	{
 		return;
 	}
