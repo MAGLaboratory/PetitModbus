@@ -19,9 +19,7 @@
 
 /****************************Don't Touch This**********************************/
 // Buffers for Petit Modbus RTU Slave
-#define PETITMODBUS_RECEIVE_BUFFER_SIZE                 (NUMBER_OF_OUTPUT_PETITREGISTERS*2 + 5) 
-#define PETITMODBUS_TRANSMIT_BUFFER_SIZE                PETITMODBUS_RECEIVE_BUFFER_SIZE
-#define PETITMODBUS_RXTX_BUFFER_SIZE                    PETITMODBUS_TRANSMIT_BUFFER_SIZE
+#define PETITMODBUS_RXTX_BUFFER_SIZE                 (NUMBER_OF_OUTPUT_PETITREGISTERS*2 + 5)
 
 // Variable for Slave Address
 extern unsigned char PETITMODBUS_SLAVE_ADDRESS;                                 // Petit Modbus RTU Slave icin adres numarasi [0 to 255]

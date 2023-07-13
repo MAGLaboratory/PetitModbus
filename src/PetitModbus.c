@@ -34,19 +34,18 @@ extern code const unsigned short PetitCRCtable[];
 
 /**********************Slave Transmit and Receive Variables********************/
 PETIT_RXTX_STATE Petit_RxTx_State = PETIT_RXTX_IDLE;
+unsigned char PetitRxTxBuffer[PETITMODBUS_RXTX_BUFFER_SIZE];
 
 PETIT_RXTX_DATA Petit_Tx_Data;
 unsigned int Petit_Tx_Delay = 0;
 unsigned int Petit_Tx_Current = 0;
 unsigned int Petit_Tx_CRC16 = 0xFFFF;
-unsigned char Petit_Tx_Buf[PETITMODBUS_TRANSMIT_BUFFER_SIZE];
-unsigned char *Petit_Tx_Ptr = &Petit_Tx_Buf[0];
+unsigned char *Petit_Tx_Ptr = &PetitRxTxBuffer[0];
 unsigned int Petit_Tx_Buf_Size = 0;
 
 PETIT_RXTX_DATA Petit_Rx_Data;
-unsigned char PetitRxBuffer[PETITMODBUS_RECEIVE_BUFFER_SIZE];
-unsigned char *Petit_Rx_Ptr = &PetitRxBuffer[0];
-unsigned int PetitRxRemaining = PETITMODBUS_RECEIVE_BUFFER_SIZE;
+unsigned char *Petit_Rx_Ptr = &PetitRxTxBuffer[0];
+unsigned int PetitRxRemaining = PETITMODBUS_RXTX_BUFFER_SIZE;
 unsigned int PetitRxCounter = 0;
 unsigned int Petit_Rx_CRC16 = 0xFFFF;
 unsigned char Petit_Rx_Data_Available = FALSE;
@@ -286,18 +285,18 @@ unsigned char CheckPetitModbusBufferComplete(void)
 	{
 		if (PetitRxCounter > 5)
 		{
-			if (PetitRxBuffer[1] >= 0x01 && PetitRxBuffer[1] <= 0x06)  // RHR
+			if (PetitRxTxBuffer[1] >= 0x01 && PetitRxTxBuffer[1] <= 0x06)  // RHR
 			{
 				PetitExpectedReceiveCount = 8;
 			}
-			else if (PetitRxBuffer[1] == 0x0F || PetitRxBuffer[1] == 0x10)
+			else if (PetitRxTxBuffer[1] == 0x0F || PetitRxTxBuffer[1] == 0x10)
 			{
-				PetitExpectedReceiveCount = PetitRxBuffer[6] + 9;
-				if (PetitExpectedReceiveCount > PETITMODBUS_RECEIVE_BUFFER_SIZE)
+				PetitExpectedReceiveCount = PetitRxTxBuffer[6] + 9;
+				if (PetitExpectedReceiveCount > PETITMODBUS_RXTX_BUFFER_SIZE)
 				{
 					PetitRxCounter = 0;
-					PetitRxRemaining = PETITMODBUS_RECEIVE_BUFFER_SIZE;
-					Petit_Rx_Ptr = &(PetitRxBuffer[0]);
+					PetitRxRemaining = PETITMODBUS_RXTX_BUFFER_SIZE;
+					Petit_Rx_Ptr = &(PetitRxTxBuffer[0]);
 					PetitExpectedReceiveCount = 0;
 					return PETIT_FALSE_FUNCTION;
 				}
@@ -305,8 +304,8 @@ unsigned char CheckPetitModbusBufferComplete(void)
 			else
 			{
 				PetitRxCounter = 0;
-				PetitRxRemaining = PETITMODBUS_RECEIVE_BUFFER_SIZE;
-				Petit_Rx_Ptr = &(PetitRxBuffer[0]);
+				PetitRxRemaining = PETITMODBUS_RXTX_BUFFER_SIZE;
+				Petit_Rx_Ptr = &(PetitRxTxBuffer[0]);
 				PetitExpectedReceiveCount = 0;
 				return PETIT_FALSE_FUNCTION;
 			}
@@ -340,14 +339,14 @@ void Petit_RxRTU(void)
 	if (Petit_ReceiveBufferControl == PETIT_DATA_READY)
 	{
 		// move to internal datastructure
-		Petit_Rx_Data.Address = PetitRxBuffer[0];
+		Petit_Rx_Data.Address = PetitRxTxBuffer[0];
 		Petit_Rx_CRC16 = 0xFFFF;
 
 		Petit_Rx_CRC16 =
 				(Petit_Rx_CRC16 >> 8)
 						^ PetitCRCtable[(Petit_Rx_CRC16 ^ Petit_Rx_Data.Address)
 								& 0xFF];
-		Petit_Rx_Data.Function = PetitRxBuffer[1];
+		Petit_Rx_Data.Function = PetitRxTxBuffer[1];
 		Petit_Rx_CRC16 =
 				(Petit_Rx_CRC16 >> 8)
 						^ PetitCRCtable[(Petit_Rx_CRC16 ^ Petit_Rx_Data.Function)
@@ -357,13 +356,13 @@ void Petit_RxRTU(void)
 
 		for (Petit_i = 2; Petit_i < PetitExpectedReceiveCount; Petit_i++)
 			Petit_Rx_Data.DataBuf[Petit_Rx_Data.DataLen++] =
-					PetitRxBuffer[Petit_i];
+					PetitRxTxBuffer[Petit_i];
 
 		Petit_RxTx_State = PETIT_RXTX_DATABUF;
 
 		PetitRxCounter = 0;
-		PetitRxRemaining = PETITMODBUS_RECEIVE_BUFFER_SIZE;
-		Petit_Rx_Ptr = &(PetitRxBuffer[0]);
+		PetitRxRemaining = PETITMODBUS_RXTX_BUFFER_SIZE;
+		Petit_Rx_Ptr = &(PetitRxTxBuffer[0]);
 		PetitExpectedReceiveCount = 0;
 	}
 
@@ -406,27 +405,27 @@ void Petit_RxRTU(void)
 void Petit_TxRTU(void)
 {
 	Petit_Tx_Buf_Size = 0;
-	Petit_Tx_Buf[Petit_Tx_Buf_Size++] = Petit_Tx_Data.Address;
+	PetitRxTxBuffer[Petit_Tx_Buf_Size++] = Petit_Tx_Data.Address;
 	Petit_Tx_CRC16 = 0xFFFF;
 	Petit_Tx_CRC16 = (Petit_Tx_CRC16 >> 8)
 			^ PetitCRCtable[(Petit_Tx_CRC16 ^ Petit_Tx_Data.Address) & 0xFF];
-	Petit_Tx_Buf[Petit_Tx_Buf_Size++] = Petit_Tx_Data.Function;
+	PetitRxTxBuffer[Petit_Tx_Buf_Size++] = Petit_Tx_Data.Function;
 	Petit_Tx_CRC16 = (Petit_Tx_CRC16 >> 8)
 			^ PetitCRCtable[(Petit_Tx_CRC16 ^ Petit_Tx_Data.Function) & 0xFF];
 	for (Petit_Tx_Current = 0; Petit_Tx_Current < Petit_Tx_Data.DataLen;
 			Petit_Tx_Current++)
 	{
-		Petit_Tx_Buf[Petit_Tx_Buf_Size++] =
+		PetitRxTxBuffer[Petit_Tx_Buf_Size++] =
 				Petit_Tx_Data.DataBuf[Petit_Tx_Current];
 		Petit_Tx_CRC16 = (Petit_Tx_CRC16 >> 8)
 				^ PetitCRCtable[(Petit_Tx_CRC16
 						^ Petit_Tx_Data.DataBuf[Petit_Tx_Current]) & 0xFF];
 	}
 
-	Petit_Tx_Buf[Petit_Tx_Buf_Size++] = Petit_Tx_CRC16;
-	Petit_Tx_Buf[Petit_Tx_Buf_Size++] = Petit_Tx_CRC16 >> 8;
+	PetitRxTxBuffer[Petit_Tx_Buf_Size++] = Petit_Tx_CRC16;
+	PetitRxTxBuffer[Petit_Tx_Buf_Size++] = Petit_Tx_CRC16 >> 8;
 
-	Petit_Tx_Ptr = &(Petit_Tx_Buf[0]);
+	Petit_Tx_Ptr = &(PetitRxTxBuffer[0]);
 
 	// one cycle for RxRTU()
 	// one cycle for TxRTU()
