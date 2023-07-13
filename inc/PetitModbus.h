@@ -11,7 +11,7 @@
 #define NUMBER_OF_OUTPUT_PETITREGISTERS                 3                       // Petit Modbus RTU Slave Output Register Number
                                                                                 // Have to put a number of registers here
                                                                                 // It has to be bigger than 0 (zero)!!
-#define PETITMODBUS_TIMEOUTTIMER                        3                       // Timeout Constant for Petit Modbus RTU Slave [millisecond]
+#define PETITMODBUS_TIMEOUTTIMER                        2                       // Timeout Constant for Petit Modbus RTU Slave [millisecond]
 
 #define PETITMODBUS_READ_HOLDING_REGISTERS_ENABLED      ( 1 )                   // If you want to use make it 1, or 0
 #define PETITMODBUSWRITE_SINGLE_REGISTER_ENABLED        ( 1 )                   // If you want to use make it 1, or 0
@@ -19,7 +19,11 @@
 
 /****************************Don't Touch This**********************************/
 // Buffers for Petit Modbus RTU Slave
-#define PETITMODBUS_RXTX_BUFFER_SIZE                 (NUMBER_OF_OUTPUT_PETITREGISTERS*2 + 5)
+// sized to hold a write to all registers
+// +2 address; +2 number of registers; +1 number of bytes to follow; +2 CRC16
+#define PETITMODBUS_RXTX_DATA_SIZE                 (NUMBER_OF_OUTPUT_PETITREGISTERS*2 + 7)
+// last offset, +1 address; +1 function
+#define PETITMODBUS_RXTX_BUFFER_SIZE               (NUMBER_OF_OUTPUT_PETITREGISTERS*2 + 9)
 
 // Variable for Slave Address
 extern unsigned char PETITMODBUS_SLAVE_ADDRESS;                                 // Petit Modbus RTU Slave icin adres numarasi [0 to 255]

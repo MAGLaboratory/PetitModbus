@@ -26,7 +26,7 @@ typedef struct
 {
 	unsigned char Address;
 	unsigned char Function;
-	unsigned char DataBuf[PETITMODBUS_RXTX_BUFFER_SIZE];
+	unsigned char DataBuf[PETITMODBUS_RXTX_DATA_SIZE];
 	unsigned short DataLen;
 } PETIT_RXTX_DATA;
 
@@ -450,7 +450,7 @@ void ProcessPetitModbus(void)
 	// process the TX delay
 	if (Petit_RxTx_State == PETIT_RXTX_TX_BEGIN)
 	{
-		if (Petit_Tx_Delay < 3)
+		if (Petit_Tx_Delay < PETITMODBUS_TIMEOUTTIMER)
 		{
 			Petit_Tx_Delay++;
 		}
