@@ -332,12 +332,15 @@ void Petit_RxRTU(void)
 {
 	unsigned char Petit_i;
 	unsigned char Petit_ReceiveBufferControl = 0;
-	unsigned char ea_save = IE_EA;                // Preserve IE_EA
-	IE_EA = 0;
+//	unsigned char ea_save = IE_EA;                // Preserve IE_EA
+//	IE_EA = 0;
 	Petit_ReceiveBufferControl = CheckPetitModbusBufferComplete();
 
 	if (Petit_ReceiveBufferControl == PETIT_DATA_READY)
 	{
+		// disable timeout
+		TCON_TR0 = false;
+		TL0 = (0x20 << TL0_TL0__SHIFT);
 		// move to internal datastructure
 		Petit_Rx_Data.Address = PetitRxTxBuffer[0];
 		Petit_Rx_CRC16 = 0xFFFF;
@@ -366,7 +369,7 @@ void Petit_RxRTU(void)
 		PetitExpectedReceiveCount = 0;
 	}
 
-	IE_EA = ea_save;
+//	IE_EA = ea_save;
 
 	if ((Petit_RxTx_State == PETIT_RXTX_DATABUF) && (Petit_Rx_Data.DataLen >= 2))
 	{
