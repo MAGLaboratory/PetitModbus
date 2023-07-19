@@ -33,7 +33,7 @@ typedef struct
 extern code const unsigned short PetitCRCtable[];
 
 /**********************Slave Transmit and Receive Variables********************/
-PETIT_RXTX_STATE Petit_RxTx_State = PETIT_RXTX_IDLE;
+PETIT_RXTX_STATE Petit_RxTx_State = PETIT_RXTX_RX;
 unsigned char PetitRxTxBuffer[PETITMODBUS_RXTX_BUFFER_SIZE];
 unsigned int Petit_CRC16 = 0xFFFF;
 
@@ -74,7 +74,7 @@ unsigned char PetitSendMessage(void)
 		return FALSE;
 
 	Petit_Tx_Current = 0;
-	Petit_RxTx_State = PETIT_RXTX_START;
+	Petit_RxTx_State = PETIT_RXTX_TX_DATABUF;
 
 	return TRUE;
 }
@@ -252,27 +252,21 @@ void HandleMPetitodbusWriteMultipleRegisters(void)
  */
 unsigned char CheckPetitModbusBufferComplete(void)
 {
-	if (!PetitExpectedReceiveCount)
+	if (PetitRxCounter > 0 && PetitRxTxBuffer[0] != PETITMODBUS_SLAVE_ADDRESS)
 	{
-		if (PetitRxCounter > 5)
+		return PETIT_FALSE_SLAVE_ADDRESS;
+	}
+
+	if (PetitRxCounter > 5 && PetitExpectedReceiveCount == 0)
+	{
+		if (PetitRxTxBuffer[1] >= 0x01 && PetitRxTxBuffer[1] <= 0x06)  // RHR
 		{
-			if (PetitRxTxBuffer[1] >= 0x01 && PetitRxTxBuffer[1] <= 0x06)  // RHR
-			{
-				PetitExpectedReceiveCount = 8;
-			}
-			else if (PetitRxTxBuffer[1] == 0x0F || PetitRxTxBuffer[1] == 0x10)
-			{
-				PetitExpectedReceiveCount = PetitRxTxBuffer[6] + 9;
-				if (PetitExpectedReceiveCount > PETITMODBUS_RXTX_BUFFER_SIZE)
-				{
-					PetitRxCounter = 0;
-					PetitRxRemaining = PETITMODBUS_RXTX_BUFFER_SIZE;
-					Petit_Rx_Ptr = &(PetitRxTxBuffer[0]);
-					PetitExpectedReceiveCount = 0;
-					return PETIT_FALSE_FUNCTION;
-				}
-			}
-			else
+			PetitExpectedReceiveCount = 8;
+		}
+		else if (PetitRxTxBuffer[1] == 0x0F || PetitRxTxBuffer[1] == 0x10)
+		{
+			PetitExpectedReceiveCount = PetitRxTxBuffer[6] + 9;
+			if (PetitExpectedReceiveCount > PETITMODBUS_RXTX_BUFFER_SIZE)
 			{
 				PetitRxCounter = 0;
 				PetitRxRemaining = PETITMODBUS_RXTX_BUFFER_SIZE;
@@ -281,7 +275,14 @@ unsigned char CheckPetitModbusBufferComplete(void)
 				return PETIT_FALSE_FUNCTION;
 			}
 		}
-
+		else
+		{
+			PetitRxCounter = 0;
+			PetitRxRemaining = PETITMODBUS_RXTX_BUFFER_SIZE;
+			Petit_Rx_Ptr = &(PetitRxTxBuffer[0]);
+			PetitExpectedReceiveCount = 0;
+			return PETIT_FALSE_FUNCTION;
+		}
 	}
 
 	if (PetitExpectedReceiveCount
@@ -323,7 +324,7 @@ void Petit_RxRTU(void)
 			Petit_Rx_Data.DataBuf[Petit_Rx_Data.DataLen++] =
 					PetitRxTxBuffer[Petit_i];
 
-		Petit_RxTx_State = PETIT_RXTX_DATABUF;
+		Petit_RxTx_State = PETIT_RXTX_RX_DATABUF;
 
 		PetitRxCounter = 0;
 		PetitRxRemaining = PETITMODBUS_RXTX_BUFFER_SIZE;
@@ -331,7 +332,7 @@ void Petit_RxRTU(void)
 		PetitExpectedReceiveCount = 0;
 	}
 
-	if ((Petit_RxTx_State == PETIT_RXTX_DATABUF) && (Petit_Rx_Data.DataLen >= 2))
+	if (Petit_RxTx_State == PETIT_RXTX_RX_DATABUF)
 	{
 		// Finish off our CRC check
 		Petit_Rx_Data.DataLen -= 2;
@@ -351,7 +352,7 @@ void Petit_RxRTU(void)
 		}
 		else
 		{
-			Petit_RxTx_State = PETIT_RXTX_IDLE;
+			Petit_RxTx_State = PETIT_RXTX_RX;
 		}
 	}
 }
@@ -383,9 +384,7 @@ void Petit_TxRTU(void)
 
 	Petit_Tx_Ptr = &(PetitRxTxBuffer[0]);
 
-	// one cycle for RxRTU()
-	// one cycle for TxRTU()
-	Petit_Tx_Delay = 2;
+	Petit_Tx_Delay = 0;
 	Petit_RxTx_State = PETIT_RXTX_TX_DLY;
 }
 
@@ -393,33 +392,29 @@ void Petit_TxRTU(void)
  * Function Name        : Petit_RxProcess
  * @How to use          : Only use this function if rx is clear for processing
  */
-void Petit_RxProcess(void)
+void Petit_ResponseProcess(void)
 {
-	// Is Data for us?
-	if (Petit_Rx_Data.Address == PETITMODBUS_SLAVE_ADDRESS)
+	// Data is for us but which function?
+	switch (Petit_Rx_Data.Function)
 	{
-		// Data is for us but which function?
-		switch (Petit_Rx_Data.Function)
-		{
 #if PETITMODBUS_READ_HOLDING_REGISTERS_ENABLED > 0
-		case PETITMODBUS_READ_HOLDING_REGISTERS:
-			HandlePetitModbusReadHoldingRegisters();
-			break;
+	case PETITMODBUS_READ_HOLDING_REGISTERS:
+		HandlePetitModbusReadHoldingRegisters();
+		break;
 #endif
 #if PETITMODBUSWRITE_SINGLE_REGISTER_ENABLED > 0
-		case PETITMODBUS_WRITE_SINGLE_REGISTER:
-			HandlePetitModbusWriteSingleRegister();
-			break;
+	case PETITMODBUS_WRITE_SINGLE_REGISTER:
+		HandlePetitModbusWriteSingleRegister();
+		break;
 #endif
 #if PETITMODBUS_WRITE_MULTIPLE_REGISTERS_ENABLED > 0
-		case PETITMODBUS_WRITE_MULTIPLE_REGISTERS:
-			HandleMPetitodbusWriteMultipleRegisters();
-			break;
+	case PETITMODBUS_WRITE_MULTIPLE_REGISTERS:
+		HandleMPetitodbusWriteMultipleRegisters();
+		break;
 #endif
-		default:
-			HandlePetitModbusError(PETIT_ERROR_CODE_01);
-			break;
-		}
+	default:
+		HandlePetitModbusError(PETIT_ERROR_CODE_01);
+		break;
 	}
 	return;
 }
@@ -434,9 +429,14 @@ void ProcessPetitModbus(void)
 {
 	switch (Petit_RxTx_State)
 	{
-	case PETIT_RXTX_START: // if the answer is ready, send it
+#if PETITMODBUS_PROCESS_POSITION > 1
+	case PETIT_RXTX_RX_PROCESS:
+		Petit_ResponseProcess();
+		// no break here.  Position 2 blends it with TxRTU.
+#endif
+	case PETIT_RXTX_TX_DATABUF: // if the answer is ready, send it
 		Petit_TxRTU();
-		// no break here to allow zero-delay sending
+		// no break here.  TxRTU always exits in a correct state.
 	case PETIT_RXTX_TX_DLY:
 		// process the TX delay
 		if (Petit_Tx_Delay < PETITMODBUS_DLY_TOP)
@@ -455,18 +455,18 @@ void ProcessPetitModbus(void)
 	case PETIT_RXTX_TX:
 		// no work is done here.  wait until transmission completes.
 		break;
-#if PETITMODBUS_RX_SPLIT > 0
+#if PETITMODBUS_PROCESS_POSITION == 1
 	case PETIT_RXTX_RX_PROCESS:
-		Petit_RxProcess();
+		Petit_ResponseProcess();
 		break;
 #endif
 	default:
 		Petit_RxRTU();
 
-#if PETITMODBUS_RX_SPLIT <= 0
+#if PETITMODBUS_PROCESS_POSITION <= 0
 		if (Petit_RxTx_State == PETIT_RXTX_RX_PROCESS)
 		{
-			Petit_RxProcess();
+			Petit_ResponseProcess();
 		}
 #endif
 		break;
