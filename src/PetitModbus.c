@@ -453,7 +453,7 @@ void ProcessPetitModbus(void)
 		}
 		break;
 	case PETIT_RXTX_TX:
-		// no work is done here.
+		// no work is done here.  wait until transmission completes.
 		break;
 #if PETITMODBUS_RX_SPLIT > 0
 	case PETIT_RXTX_RX_PROCESS:
