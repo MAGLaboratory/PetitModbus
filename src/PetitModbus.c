@@ -265,19 +265,11 @@ unsigned char CheckPetitModbusBufferComplete(void)
 			PetitExpectedReceiveCount = PetitRxTxBuffer[6] + 9;
 			if (PetitExpectedReceiveCount > PETITMODBUS_RXTX_BUFFER_SIZE)
 			{
-				PetitRxCounter = 0;
-				PetitRxRemaining = PETITMODBUS_RXTX_BUFFER_SIZE;
-				Petit_Rx_Ptr = &(PetitRxTxBuffer[0]);
-				PetitExpectedReceiveCount = 0;
 				return PETIT_FALSE_FUNCTION;
 			}
 		}
 		else
 		{
-			PetitRxCounter = 0;
-			PetitRxRemaining = PETITMODBUS_RXTX_BUFFER_SIZE;
-			Petit_Rx_Ptr = &(PetitRxTxBuffer[0]);
-			PetitExpectedReceiveCount = 0;
 			return PETIT_FALSE_FUNCTION;
 		}
 	}
