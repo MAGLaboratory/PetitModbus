@@ -22,7 +22,7 @@
 // sized to hold a write to all registers
 // +2 address; +2 number of registers; +1 number of bytes to follow; +2 CRC16
 #define PETITMODBUS_RXTX_DATA_SIZE                 (NUMBER_OF_OUTPUT_PETITREGISTERS*2 + 7)
-// last offset, +1 address; +1 function
+// last offset, +1 slave address; +1 function
 #define PETITMODBUS_RXTX_BUFFER_SIZE               (NUMBER_OF_OUTPUT_PETITREGISTERS*2 + 9)
 
 // Variable for Slave Address

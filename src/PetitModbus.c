@@ -36,14 +36,13 @@ extern code const unsigned short PetitCRCtable[];
 PETIT_RXTX_STATE Petit_RxTx_State = PETIT_RXTX_RX;
 unsigned char PetitRxTxBuffer[PETITMODBUS_RXTX_BUFFER_SIZE];
 unsigned int Petit_CRC16 = 0xFFFF;
+PETIT_RXTX_DATA Petit_RxTx_Data;
 
-PETIT_RXTX_DATA Petit_Tx_Data;
 unsigned int Petit_Tx_Delay = 0;
 unsigned int Petit_Tx_Current = 0;
 unsigned char *Petit_Tx_Ptr = &PetitRxTxBuffer[0];
 unsigned int Petit_Tx_Buf_Size = 0;
 
-PETIT_RXTX_DATA Petit_Rx_Data;
 unsigned char *Petit_Rx_Ptr = &PetitRxTxBuffer[0];
 unsigned int PetitRxRemaining = PETITMODBUS_RXTX_BUFFER_SIZE;
 unsigned int PetitRxCounter = 0;
@@ -85,10 +84,9 @@ unsigned char PetitSendMessage(void)
 void HandlePetitModbusError(char ErrorCode)
 {
 	// Initialise the output buffer. The first byte in the buffer says how many registers we have read
-	Petit_Tx_Data.Function = ErrorCode | 0x80;
-	Petit_Tx_Data.Address = PETITMODBUS_SLAVE_ADDRESS;
-	Petit_Tx_Data.DataLen = 1;
-	Petit_Tx_Data.DataBuf[0] = ErrorCode;
+	Petit_RxTx_Data.Function |= 0x80;
+	Petit_RxTx_Data.DataLen = 1;
+	Petit_RxTx_Data.DataBuf[0] = ErrorCode;
 	PetitSendMessage();
 }
 
@@ -109,10 +107,10 @@ void HandlePetitModbusReadHoldingRegisters(void)
 	unsigned int Petit_i = 0;
 
 	// The message contains the requested start address and number of registers
-	Petit_StartAddress = ((unsigned int) (Petit_Rx_Data.DataBuf[0]) << 8)
-			+ (unsigned int) (Petit_Rx_Data.DataBuf[1]);
-	Petit_NumberOfRegisters = ((unsigned int) (Petit_Rx_Data.DataBuf[2]) << 8)
-			+ (unsigned int) (Petit_Rx_Data.DataBuf[3]);
+	Petit_StartAddress = ((unsigned int) (Petit_RxTx_Data.DataBuf[0]) << 8)
+			+ (unsigned int) (Petit_RxTx_Data.DataBuf[1]);
+	Petit_NumberOfRegisters = ((unsigned int) (Petit_RxTx_Data.DataBuf[2]) << 8)
+			+ (unsigned int) (Petit_RxTx_Data.DataBuf[3]);
 
 	// If it is bigger than RegisterNumber return error to Modbus Master
 	if ((Petit_StartAddress + Petit_NumberOfRegisters)
@@ -121,22 +119,20 @@ void HandlePetitModbusReadHoldingRegisters(void)
 	else
 	{
 		// Initialise the output buffer. The first byte in the buffer says how many registers we have read
-		Petit_Tx_Data.Function = PETITMODBUS_READ_HOLDING_REGISTERS;
-		Petit_Tx_Data.Address = PETITMODBUS_SLAVE_ADDRESS;
-		Petit_Tx_Data.DataLen = 1;
-		Petit_Tx_Data.DataBuf[0] = 0;
+		Petit_RxTx_Data.DataLen = 1;
+		Petit_RxTx_Data.DataBuf[0] = 0;
 
 		for (Petit_i = 0; Petit_i < Petit_NumberOfRegisters; Petit_i++)
 		{
 			unsigned short Petit_CurrentData = PetitRegisters[Petit_StartAddress
 					+ Petit_i];
 
-			Petit_Tx_Data.DataBuf[Petit_Tx_Data.DataLen] =
+			Petit_RxTx_Data.DataBuf[Petit_RxTx_Data.DataLen] =
 					(unsigned char) ((Petit_CurrentData & 0xFF00) >> 8);
-			Petit_Tx_Data.DataBuf[Petit_Tx_Data.DataLen + 1] =
+			Petit_RxTx_Data.DataBuf[Petit_RxTx_Data.DataLen + 1] =
 					(unsigned char) (Petit_CurrentData & 0xFF);
-			Petit_Tx_Data.DataLen += 2;
-			Petit_Tx_Data.DataBuf[0] = Petit_Tx_Data.DataLen - 1;
+			Petit_RxTx_Data.DataLen += 2;
+			Petit_RxTx_Data.DataBuf[0] = Petit_RxTx_Data.DataLen - 1;
 		}
 
 		PetitSendMessage();
@@ -159,15 +155,13 @@ void HandlePetitModbusWriteSingleRegister(void)
 	unsigned char Petit_i = 0;
 
 	// The message contains the requested start address and number of registers
-	Petit_Address = ((unsigned int) (Petit_Rx_Data.DataBuf[0]) << 8)
-			+ (unsigned int) (Petit_Rx_Data.DataBuf[1]);
-	Petit_Value = ((unsigned int) (Petit_Rx_Data.DataBuf[2]) << 8)
-			+ (unsigned int) (Petit_Rx_Data.DataBuf[3]);
+	Petit_Address = ((unsigned int) (Petit_RxTx_Data.DataBuf[0]) << 8)
+			+ (unsigned int) (Petit_RxTx_Data.DataBuf[1]);
+	Petit_Value = ((unsigned int) (Petit_RxTx_Data.DataBuf[2]) << 8)
+			+ (unsigned int) (Petit_RxTx_Data.DataBuf[3]);
 
 	// Initialise the output buffer. The first byte in the buffer says how many registers we have read
-	Petit_Tx_Data.Function = PETITMODBUS_WRITE_SINGLE_REGISTER;
-	Petit_Tx_Data.Address = PETITMODBUS_SLAVE_ADDRESS;
-	Petit_Tx_Data.DataLen = 4;
+	Petit_RxTx_Data.DataLen = 4;
 
 	if (Petit_Address >= NUMBER_OF_OUTPUT_PETITREGISTERS)
 		HandlePetitModbusError(PETIT_ERROR_CODE_02);
@@ -175,9 +169,6 @@ void HandlePetitModbusWriteSingleRegister(void)
 	{
 		PetitRegisters[Petit_Address] = Petit_Value;
 		// Output data buffer is exact copy of input buffer
-		for (Petit_i = 0; Petit_i < 4; ++Petit_i)
-			Petit_Tx_Data.DataBuf[Petit_i] = Petit_Rx_Data.DataBuf[Petit_i];
-
 		PetitRegChange = 1;
 	}
 
@@ -202,11 +193,11 @@ void HandleMPetitodbusWriteMultipleRegisters(void)
 	unsigned int Petit_Value = 0;
 
 	// The message contains the requested start address and number of registers
-	Petit_StartAddress = ((unsigned int) (Petit_Rx_Data.DataBuf[0]) << 8)
-			+ (unsigned int) (Petit_Rx_Data.DataBuf[1]);
-	Petit_NumberOfRegisters = ((unsigned int) (Petit_Rx_Data.DataBuf[2]) << 8)
-			+ (unsigned int) (Petit_Rx_Data.DataBuf[3]);
-	Petit_ByteCount = Petit_Rx_Data.DataBuf[4];
+	Petit_StartAddress = ((unsigned int) (Petit_RxTx_Data.DataBuf[0]) << 8)
+			+ (unsigned int) (Petit_RxTx_Data.DataBuf[1]);
+	Petit_NumberOfRegisters = ((unsigned int) (Petit_RxTx_Data.DataBuf[2]) << 8)
+			+ (unsigned int) (Petit_RxTx_Data.DataBuf[3]);
+	Petit_ByteCount = Petit_RxTx_Data.DataBuf[4];
 
 	// If it is bigger than RegisterNumber return error to Modbus Master
 	if ((Petit_StartAddress + Petit_NumberOfRegisters)
@@ -215,19 +206,13 @@ void HandleMPetitodbusWriteMultipleRegisters(void)
 	else
 	{
 		// Initialise the output buffer. The first byte in the buffer says how many outputs we have set
-		Petit_Tx_Data.Function = PETITMODBUS_WRITE_MULTIPLE_REGISTERS;
-		Petit_Tx_Data.Address = PETITMODBUS_SLAVE_ADDRESS;
-		Petit_Tx_Data.DataLen = 4;
-		Petit_Tx_Data.DataBuf[0] = Petit_Rx_Data.DataBuf[0];
-		Petit_Tx_Data.DataBuf[1] = Petit_Rx_Data.DataBuf[1];
-		Petit_Tx_Data.DataBuf[2] = Petit_Rx_Data.DataBuf[2];
-		Petit_Tx_Data.DataBuf[3] = Petit_Rx_Data.DataBuf[3];
+		Petit_RxTx_Data.DataLen = 4;
 
 		// Output data buffer is exact copy of input buffer
 		for (Petit_i = 0; Petit_i < Petit_NumberOfRegisters; Petit_i++)
 		{
-			Petit_Value = (Petit_Rx_Data.DataBuf[5 + 2 * Petit_i] << 8)
-					+ (Petit_Rx_Data.DataBuf[6 + 2 * Petit_i]);
+			Petit_Value = (Petit_RxTx_Data.DataBuf[5 + 2 * Petit_i] << 8)
+					+ (Petit_RxTx_Data.DataBuf[6 + 2 * Petit_i]);
 			PetitRegisters[Petit_StartAddress + Petit_i] = Petit_Value;
 		}
 
@@ -303,14 +288,14 @@ void Petit_RxRTU(void)
 
 		Petit_CRC16 = 0xFFFF;
 		// move to internal datastructure
-		Petit_Rx_Data.Address = PetitRxTxBuffer[0];
-		Petit_CRC16_Calc(Petit_Rx_Data.Address);
-		Petit_Rx_Data.Function = PetitRxTxBuffer[1];
-		Petit_CRC16_Calc(Petit_Rx_Data.Function);
-		Petit_Rx_Data.DataLen = 0;
+		Petit_RxTx_Data.Address = PetitRxTxBuffer[0];
+		Petit_CRC16_Calc(Petit_RxTx_Data.Address);
+		Petit_RxTx_Data.Function = PetitRxTxBuffer[1];
+		Petit_CRC16_Calc(Petit_RxTx_Data.Function);
+		Petit_RxTx_Data.DataLen = 0;
 
 		for (Petit_i = 2; Petit_i < PetitExpectedReceiveCount; Petit_i++)
-			Petit_Rx_Data.DataBuf[Petit_Rx_Data.DataLen++] =
+			Petit_RxTx_Data.DataBuf[Petit_RxTx_Data.DataLen++] =
 					PetitRxTxBuffer[Petit_i];
 
 		PetitRxCounter = 0;
@@ -319,16 +304,16 @@ void Petit_RxRTU(void)
 		PetitExpectedReceiveCount = 0;
 
 		// Finish off our CRC check
-		Petit_Rx_Data.DataLen -= 2;
-		for (Petit_i = 0; Petit_i < Petit_Rx_Data.DataLen; ++Petit_i)
+		Petit_RxTx_Data.DataLen -= 2;
+		for (Petit_i = 0; Petit_i < Petit_RxTx_Data.DataLen; ++Petit_i)
 		{
-			Petit_CRC16_Calc(Petit_Rx_Data.DataBuf[Petit_i]);
+			Petit_CRC16_Calc(Petit_RxTx_Data.DataBuf[Petit_i]);
 		}
 
 		// allow LSB read
 
-		if (((unsigned int) Petit_Rx_Data.DataBuf[Petit_Rx_Data.DataLen]
-				+ ((unsigned int) Petit_Rx_Data.DataBuf[Petit_Rx_Data.DataLen
+		if (((unsigned int) Petit_RxTx_Data.DataBuf[Petit_RxTx_Data.DataLen]
+				+ ((unsigned int) Petit_RxTx_Data.DataBuf[Petit_RxTx_Data.DataLen
 						+ 1] << 8)) == Petit_CRC16)
 		{
 			// Valid message!
@@ -351,16 +336,16 @@ void Petit_TxRTU(void)
 {
 	Petit_Tx_Buf_Size = 0;
 	Petit_CRC16 = 0xFFFF;
-	PetitRxTxBuffer[Petit_Tx_Buf_Size++] = Petit_Tx_Data.Address;
-	Petit_CRC16_Calc(Petit_Tx_Data.Address);
-	PetitRxTxBuffer[Petit_Tx_Buf_Size++] = Petit_Tx_Data.Function;
-	Petit_CRC16_Calc(Petit_Tx_Data.Function);
-	for (Petit_Tx_Current = 0; Petit_Tx_Current < Petit_Tx_Data.DataLen;
+	PetitRxTxBuffer[Petit_Tx_Buf_Size++] = Petit_RxTx_Data.Address;
+	Petit_CRC16_Calc(Petit_RxTx_Data.Address);
+	PetitRxTxBuffer[Petit_Tx_Buf_Size++] = Petit_RxTx_Data.Function;
+	Petit_CRC16_Calc(Petit_RxTx_Data.Function);
+	for (Petit_Tx_Current = 0; Petit_Tx_Current < Petit_RxTx_Data.DataLen;
 			Petit_Tx_Current++)
 	{
 		PetitRxTxBuffer[Petit_Tx_Buf_Size++] =
-				Petit_Tx_Data.DataBuf[Petit_Tx_Current];
-		Petit_CRC16_Calc(Petit_Tx_Data.DataBuf[Petit_Tx_Current]);
+				Petit_RxTx_Data.DataBuf[Petit_Tx_Current];
+		Petit_CRC16_Calc(Petit_RxTx_Data.DataBuf[Petit_Tx_Current]);
 	}
 
 	PetitRxTxBuffer[Petit_Tx_Buf_Size++] = Petit_CRC16;
@@ -379,7 +364,7 @@ void Petit_TxRTU(void)
 void Petit_ResponseProcess(void)
 {
 	// Data is for us but which function?
-	switch (Petit_Rx_Data.Function)
+	switch (Petit_RxTx_Data.Function)
 	{
 #if PETITMODBUS_READ_HOLDING_REGISTERS_ENABLED > 0
 	case PETITMODBUS_READ_HOLDING_REGISTERS:
