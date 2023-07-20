@@ -36,7 +36,6 @@ extern unsigned char PetitRegChange;
 typedef enum
 {
     PETIT_RXTX_RX = 0,
-    PETIT_RXTX_RX_DATABUF,
 	PETIT_RXTX_RX_PROCESS,
     PETIT_RXTX_TX_DATABUF,
 	PETIT_RXTX_TX_DLY,
@@ -45,7 +44,35 @@ typedef enum
 }  PETIT_RXTX_STATE;
 
 // Main Functions
-extern void             ProcessPetitModbus(void);
+extern void                  ProcessPetitModbus(void);
+
+// endianness determination
+#ifdef __BYTE_ORDER__
+#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+#define PETIT_BIG_ENDIAN
+#else
+#define PETIT_LITTLE_ENDIAN
+#endif
+#else
+#ifdef __C51__
+#define PETIT_BIG_ENDIAN (1)
+#endif
+#ifdef SDCC
+#deifne PETIT_LITTLE_ENDIAN (1)
+#endif
+#endif
+
+#if PETIT_BIG_ENDIAN
+#define MB2REG(DATA) (DATA)
+#define REG2MB(DATA) (DATA)
+#define MB2CRC(DATA) ((DATA & 0xFF00) >> 8 | (DATA & 0xFF) << 8)
+#define CRC2MB(DATA) ((DATA & 0xFF00) >> 8 | (DATA & 0xFF) << 8)
+#else
+#define MB2REG(DATA) ((DATA & 0xFF00) >> 8 | (DATA & 0xFF) << 8)
+#define REG2MB(DATA) ((DATA & 0xFF00) >> 8 | (DATA & 0xFF) << 8)
+#define MB2CRC(DATA) (DATA)
+#define CRC2MB(DATA) (DATA)
+#endif
 
 // Petit Modbus Port Header
 #include "PetitModbusPort.h"
