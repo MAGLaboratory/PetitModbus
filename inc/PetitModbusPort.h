@@ -27,14 +27,16 @@ extern unsigned char* Petit_Tx_Ptr;
 
 extern PETIT_RXTX_STATE Petit_RxTx_State;
 
-extern void PetitUartBegin();
-extern void PetitUartRxBufferReset();
-extern void PetitUartTxBufferReset();
-extern unsigned char PetitUartRxBufferInsert(unsigned char rcvd);
-extern unsigned char PetitUartTxBufferPop(unsigned char* tx);
-extern void PetitTimerStart();
-extern void PetitTimerStop();
-extern void PetitTxPinOn();
-extern void PetitTxPinOff();
+// functions for porting
+extern void PetitPortUartBegin(unsigned char tx);
+extern void PetitPortTimerStart(void);
+extern void PetitPortTimerStop(void);
+extern void PetitPortTxPinOn(void);
+extern void PetitPortTxPinOff(void);
+
+// functions defined by petit modbus
+extern void PetitRxBufferReset(void);
+extern unsigned char PetitRxBufferInsert(unsigned char rcvd);
+extern unsigned char PetitTxBufferPop(unsigned char* tx);
 
 #endif

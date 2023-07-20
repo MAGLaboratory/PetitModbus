@@ -47,9 +47,9 @@ unsigned int PetitRxRemaining = PETITMODBUS_RXTX_BUFFER_SIZE;
 unsigned int PetitRxCounter = 0;
 
 unsigned char PetitExpectedReceiveCount = 0;
-/*****************************************************************************/
+/*************************************************k****************************/
 
-void PetitUartRxBufferReset()
+void PetitRxBufferReset()
 {
 	PetitRxCounter = 0;
 	PetitRxRemaining = PETITMODBUS_RXTX_BUFFER_SIZE;
@@ -58,20 +58,20 @@ void PetitUartRxBufferReset()
 	return;
 }
 
-unsigned char PetitUartRxBufferInsert(unsigned char rcvd)
+unsigned char PetitRxBufferInsert(unsigned char rcvd)
 {
 	if (PetitRxRemaining && Petit_RxTx_State == PETIT_RXTX_RX)
 	{
 		*Petit_Rx_Ptr++ = rcvd;
 		PetitRxRemaining--;
 		PetitRxCounter++;
-		PetitTimerStart();
+		PetitPortTimerStart();
 		return 0;
 	}
 	return 1;
 }
 
-unsigned char PetitUartTxBufferPop(unsigned char* tx)
+unsigned char PetitTxBufferPop(unsigned char* tx)
 {
 	if (Petit_RxTx_State == PETIT_RXTX_TX && Petit_Tx_Buf_Size != 0)
 	{
@@ -318,7 +318,7 @@ void Petit_RxRTU(void)
 	if (Petit_ReceiveBufferControl == PETIT_DATA_READY)
 	{
 		// disable timeout
-		PetitTimerStop();
+		PetitPortTimerStop();
 
 		Petit_CRC16 = 0xFFFF;
 		// move to internal datastructure
@@ -332,7 +332,7 @@ void Petit_RxRTU(void)
 			Petit_RxTx_Data.DataBuf[Petit_RxTx_Data.DataLen++] =
 					PetitRxTxBuffer[Petit_i];
 
-		PetitUartRxBufferReset();
+		PetitRxBufferReset();
 
 		// Finish off our CRC check
 		Petit_RxTx_Data.DataLen -= 2;
@@ -447,7 +447,8 @@ void ProcessPetitModbus(void)
 		{
 			// print first character to start UART peripheral
 			Petit_RxTx_State = PETIT_RXTX_TX;
-			PetitUartBegin();
+			PetitPortUartBegin(*Petit_Tx_Ptr++);
+			Petit_Tx_Buf_Size--;
 		}
 		break;
 	case PETIT_RXTX_TX:
