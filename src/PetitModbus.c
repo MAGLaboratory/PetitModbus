@@ -1,5 +1,4 @@
 #include "PetitModbus.h"
-#include <SI_EFM8BB1_Register_Enums.h>
 
 /*******************************ModBus Functions*******************************/
 #define PETITMODBUS_READ_COILS                  1
@@ -49,6 +48,42 @@ unsigned int PetitRxCounter = 0;
 
 unsigned char PetitExpectedReceiveCount = 0;
 /*****************************************************************************/
+
+void PetitUartRxBufferReset()
+{
+	PetitRxCounter = 0;
+	PetitRxRemaining = PETITMODBUS_RXTX_BUFFER_SIZE;
+	Petit_Rx_Ptr = &(PetitRxTxBuffer[0]);
+	PetitExpectedReceiveCount = 0;
+	return;
+}
+
+unsigned char PetitUartRxBufferInsert(unsigned char rcvd)
+{
+	if (PetitRxRemaining && Petit_RxTx_State == PETIT_RXTX_RX)
+	{
+		*Petit_Rx_Ptr++ = rcvd;
+		PetitRxRemaining--;
+		PetitRxCounter++;
+		PetitTimerStart();
+		return 0;
+	}
+	return 1;
+}
+
+unsigned char PetitUartTxBufferPop(unsigned char* tx)
+{
+	if (Petit_RxTx_State == PETIT_RXTX_TX && Petit_Tx_Buf_Size != 0)
+	{
+		*tx = *Petit_Tx_Ptr++;
+		Petit_Tx_Buf_Size--;
+		return 1;
+	}
+	// transmission complete.  return to receive mode.
+	// the direction pin is handled by the porting code
+	Petit_RxTx_State = PETIT_RXTX_RX;
+	return 0;
+}
 
 /*
  * Function Name        : CRC16_Calc
@@ -283,8 +318,7 @@ void Petit_RxRTU(void)
 	if (Petit_ReceiveBufferControl == PETIT_DATA_READY)
 	{
 		// disable timeout
-		TCON_TR0 = false;
-		TL0 = (0x20 << TL0_TL0__SHIFT);
+		PetitTimerStop();
 
 		Petit_CRC16 = 0xFFFF;
 		// move to internal datastructure
@@ -298,10 +332,7 @@ void Petit_RxRTU(void)
 			Petit_RxTx_Data.DataBuf[Petit_RxTx_Data.DataLen++] =
 					PetitRxTxBuffer[Petit_i];
 
-		PetitRxCounter = 0;
-		PetitRxRemaining = PETITMODBUS_RXTX_BUFFER_SIZE;
-		Petit_Rx_Ptr = &(PetitRxTxBuffer[0]);
-		PetitExpectedReceiveCount = 0;
+		PetitUartRxBufferReset();
 
 		// Finish off our CRC check
 		Petit_RxTx_Data.DataLen -= 2;
@@ -415,10 +446,8 @@ void ProcessPetitModbus(void)
 		else
 		{
 			// print first character to start UART peripheral
-			P0_B3 = true;
-			SBUF0 = *Petit_Tx_Ptr++;
-			Petit_Tx_Buf_Size--;
 			Petit_RxTx_State = PETIT_RXTX_TX;
+			PetitUartBegin();
 		}
 		break;
 	case PETIT_RXTX_TX:
