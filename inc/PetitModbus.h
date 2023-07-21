@@ -11,7 +11,7 @@
 #define NUMBER_OF_OUTPUT_PETITREGISTERS           ( 3 )                      // Petit Modbus RTU Slave Output Register Number
                                                                              // Have to put a number of registers here
                                                                              // It has to be bigger than 0 (zero)!!
-#define PETITMODBUS_DLY_TOP                       ( 1 )                      // Timeout Constant for Petit Modbus RTU Slave [millisecond]
+#define PETITMODBUS_DLY_TOP                       ( 0 )                      // Timeout Constant for Petit Modbus RTU Slave [millisecond]
 
 #define PETITMODBUS_READ_HOLDING_REGISTERS_ENABLED      ( 1 )                   // If you want to use make it 1, or 0
 #define PETITMODBUSWRITE_SINGLE_REGISTER_ENABLED        ( 1 )                   // If you want to use make it 1, or 0
