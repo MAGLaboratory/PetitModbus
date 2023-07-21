@@ -15,11 +15,11 @@
 #endif
 
 // functions to be defined for porting
-extern void PetitPortUartBegin(unsigned char tx);
+extern void PetitPortTxBegin(unsigned char tx);
 extern void PetitPortTimerStart(void);
 extern void PetitPortTimerStop(void);
-extern void PetitPortTxPinOn(void);
-extern void PetitPortTxPinOff(void);
+extern void PetitPortDirTx(void);
+extern void PetitPortDirRx(void);
 
 // functions defined by petit modbus
 extern void PetitRxBufferReset(void);

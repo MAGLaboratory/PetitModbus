@@ -21,26 +21,17 @@
 
 unsigned char PETITMODBUS_SLAVE_ADDRESS = 1;
 
-typedef struct
-{
-	unsigned char Address;
-	unsigned char Function;
-	unsigned char DataBuf[PETITMODBUS_RXTX_DATA_SIZE];
-	unsigned short DataLen;
-} PETIT_RXTX_DATA;
-
 extern code const unsigned short PetitCRCtable[];
 
 /**********************Slave Transmit and Receive Variables********************/
 PETIT_RXTX_STATE Petit_RxTx_State = PETIT_RXTX_RX;
 unsigned char PetitBuffer[PETITMODBUS_RXTX_BUFFER_SIZE];
 unsigned int Petit_CRC16 = 0xFFFF;
-PETIT_RXTX_DATA Petit_RxTx_Data;
 unsigned int PetitBufIdx = 0;
+unsigned char *Petit_Ptr = &PetitBuffer[0];
+unsigned int PetitBufProcIdx = 0;
 
 unsigned int Petit_Tx_Delay = 0;
-unsigned char *Petit_Ptr = &PetitBuffer[0];
-unsigned int Petit_Tx_Buf_Size = 0;
 
 unsigned int PetitExpectedReceiveCount = 0;
 /*************************************************k****************************/
@@ -68,16 +59,15 @@ unsigned char PetitRxBufferInsert(unsigned char rcvd)
 
 unsigned char PetitTxBufferPop(unsigned char* tx)
 {
-	if (Petit_RxTx_State == PETIT_RXTX_TX && Petit_Tx_Buf_Size != 0)
+	if (Petit_RxTx_State == PETIT_RXTX_TX && PetitBufIdx != 0)
 	{
 		*tx = *Petit_Ptr++;
-		Petit_Tx_Buf_Size--;
+		PetitBufIdx--;
 		return 1;
 	}
 	// transmission complete.  return to receive mode.
 	// the direction pin is handled by the porting code
 	Petit_RxTx_State = PETIT_RXTX_RX;
-	PetitBufIdx = 0;
 	Petit_Ptr = &(PetitBuffer[0]);
 	return 0;
 }
@@ -116,9 +106,9 @@ unsigned char PetitSendMessage(void)
 void HandlePetitModbusError(char ErrorCode)
 {
 	// Initialise the output buffer. The first byte in the buffer says how many registers we have read
-	Petit_RxTx_Data.Function |= 0x80;
-	Petit_RxTx_Data.DataLen = 1;
-	Petit_RxTx_Data.DataBuf[0] = ErrorCode;
+	PetitBuffer[1] |= 0x80;
+	PetitBuffer[2] = ErrorCode;
+	PetitBufProcIdx = 3;
 	PetitSendMessage();
 }
 
@@ -139,10 +129,10 @@ void HandlePetitModbusReadHoldingRegisters(void)
 	unsigned int Petit_i = 0;
 
 	// The message contains the requested start address and number of registers
-	Petit_StartAddress = ((unsigned int) (Petit_RxTx_Data.DataBuf[0]) << 8)
-			+ (unsigned int) (Petit_RxTx_Data.DataBuf[1]);
-	Petit_NumberOfRegisters = ((unsigned int) (Petit_RxTx_Data.DataBuf[2]) << 8)
-			+ (unsigned int) (Petit_RxTx_Data.DataBuf[3]);
+	Petit_StartAddress = ((unsigned int) (PetitBuffer[2]) << 8)
+			+ (unsigned int) (PetitBuffer[3]);
+	Petit_NumberOfRegisters = ((unsigned int) (PetitBuffer[4]) << 8)
+			+ (unsigned int) (PetitBuffer[5]);
 
 	// If it is bigger than RegisterNumber return error to Modbus Master
 	if ((Petit_StartAddress + Petit_NumberOfRegisters)
@@ -151,21 +141,21 @@ void HandlePetitModbusReadHoldingRegisters(void)
 	else
 	{
 		// Initialise the output buffer. The first byte in the buffer says how many registers we have read
-		Petit_RxTx_Data.DataLen = 1;
-		Petit_RxTx_Data.DataBuf[0] = 0;
+		PetitBufProcIdx = 3;
+		PetitBuffer[2] = 0;
 
 		for (Petit_i = 0; Petit_i < Petit_NumberOfRegisters; Petit_i++)
 		{
 			unsigned short Petit_CurrentData = PetitRegisters[Petit_StartAddress
 					+ Petit_i];
 
-			Petit_RxTx_Data.DataBuf[Petit_RxTx_Data.DataLen] =
+			PetitBuffer[PetitBufProcIdx] =
 					(unsigned char) ((Petit_CurrentData & 0xFF00) >> 8);
-			Petit_RxTx_Data.DataBuf[Petit_RxTx_Data.DataLen + 1] =
+			PetitBuffer[PetitBufProcIdx + 1] =
 					(unsigned char) (Petit_CurrentData & 0xFF);
-			Petit_RxTx_Data.DataLen += 2;
-			Petit_RxTx_Data.DataBuf[0] = Petit_RxTx_Data.DataLen - 1;
+			PetitBufProcIdx += 2;
 		}
+		PetitBuffer[2] = PetitBufProcIdx - 3;
 
 		PetitSendMessage();
 	}
@@ -187,13 +177,13 @@ void HandlePetitModbusWriteSingleRegister(void)
 	unsigned char Petit_i = 0;
 
 	// The message contains the requested start address and number of registers
-	Petit_Address = ((unsigned int) (Petit_RxTx_Data.DataBuf[0]) << 8)
-			+ (unsigned int) (Petit_RxTx_Data.DataBuf[1]);
-	Petit_Value = ((unsigned int) (Petit_RxTx_Data.DataBuf[2]) << 8)
-			+ (unsigned int) (Petit_RxTx_Data.DataBuf[3]);
+	Petit_Address = ((unsigned int) (PetitBuffer[2]) << 8)
+			+ (unsigned int) (PetitBuffer[3]);
+	Petit_Value = ((unsigned int) (PetitBuffer[4]) << 8)
+			+ (unsigned int) (PetitBuffer[5]);
 
 	// Initialise the output buffer. The first byte in the buffer says how many registers we have read
-	Petit_RxTx_Data.DataLen = 4;
+	PetitBufProcIdx = 6;
 
 	if (Petit_Address >= NUMBER_OF_OUTPUT_PETITREGISTERS)
 		HandlePetitModbusError(PETIT_ERROR_CODE_02);
@@ -225,11 +215,11 @@ void HandleMPetitodbusWriteMultipleRegisters(void)
 	unsigned int Petit_Value = 0;
 
 	// The message contains the requested start address and number of registers
-	Petit_StartAddress = ((unsigned int) (Petit_RxTx_Data.DataBuf[0]) << 8)
-			+ (unsigned int) (Petit_RxTx_Data.DataBuf[1]);
-	Petit_NumberOfRegisters = ((unsigned int) (Petit_RxTx_Data.DataBuf[2]) << 8)
-			+ (unsigned int) (Petit_RxTx_Data.DataBuf[3]);
-	Petit_ByteCount = Petit_RxTx_Data.DataBuf[4];
+	Petit_StartAddress = ((unsigned int) (PetitBuffer[2]) << 8)
+			+ (unsigned int) (PetitBuffer[3]);
+	Petit_NumberOfRegisters = ((unsigned int) (PetitBuffer[4]) << 8)
+			+ (unsigned int) (PetitBuffer[5]);
+	Petit_ByteCount = PetitBuffer[6];
 
 	// If it is bigger than RegisterNumber return error to Modbus Master
 	if ((Petit_StartAddress + Petit_NumberOfRegisters)
@@ -238,13 +228,13 @@ void HandleMPetitodbusWriteMultipleRegisters(void)
 	else
 	{
 		// Initialise the output buffer. The first byte in the buffer says how many outputs we have set
-		Petit_RxTx_Data.DataLen = 4;
+		PetitBufProcIdx = 6;
 
 		// Output data buffer is exact copy of input buffer
 		for (Petit_i = 0; Petit_i < Petit_NumberOfRegisters; Petit_i++)
 		{
-			Petit_Value = (Petit_RxTx_Data.DataBuf[5 + 2 * Petit_i] << 8)
-					+ (Petit_RxTx_Data.DataBuf[6 + 2 * Petit_i]);
+			Petit_Value = (PetitBuffer[7 + 2 * Petit_i] << 8)
+					+ (PetitBuffer[8 + 2 * Petit_i]);
 			PetitRegisters[Petit_StartAddress + Petit_i] = Petit_Value;
 		}
 
@@ -317,31 +307,20 @@ void Petit_RxRTU(void)
 		// disable timeout
 		PetitPortTimerStop();
 
+		// CRC check
 		Petit_CRC16 = 0xFFFF;
-		// move to internal datastructure
-		Petit_RxTx_Data.Address = PetitBuffer[0];
-		Petit_CRC16_Calc(Petit_RxTx_Data.Address);
-		Petit_RxTx_Data.Function = PetitBuffer[1];
-		Petit_CRC16_Calc(Petit_RxTx_Data.Function);
-		Petit_RxTx_Data.DataLen = 0;
-
-		for (Petit_i = 2; Petit_i < PetitExpectedReceiveCount; Petit_i++)
-			Petit_RxTx_Data.DataBuf[Petit_RxTx_Data.DataLen++] =
-					PetitBuffer[Petit_i];
+		PetitBufProcIdx = PetitExpectedReceiveCount;
+		PetitBufProcIdx -= 2;
+		for (Petit_i = 0; Petit_i < PetitBufProcIdx; ++Petit_i)
+		{
+			Petit_CRC16_Calc(PetitBuffer[Petit_i]);
+		}
 
 		PetitRxBufferReset();
 
-		// Finish off our CRC check
-		Petit_RxTx_Data.DataLen -= 2;
-		for (Petit_i = 0; Petit_i < Petit_RxTx_Data.DataLen; ++Petit_i)
-		{
-			Petit_CRC16_Calc(Petit_RxTx_Data.DataBuf[Petit_i]);
-		}
-
 		// allow LSB read
-
-		if (((unsigned int) Petit_RxTx_Data.DataBuf[Petit_RxTx_Data.DataLen]
-				+ ((unsigned int) Petit_RxTx_Data.DataBuf[Petit_RxTx_Data.DataLen
+		if (((unsigned int) PetitBuffer[PetitBufProcIdx]
+				+ ((unsigned int) PetitBuffer[PetitBufProcIdx
 						+ 1] << 8)) == Petit_CRC16)
 		{
 			// Valid message!
@@ -362,22 +341,15 @@ void Petit_RxRTU(void)
  */
 void Petit_TxRTU(void)
 {
-	Petit_Tx_Buf_Size = 0;
 	Petit_CRC16 = 0xFFFF;
-	PetitBuffer[Petit_Tx_Buf_Size++] = Petit_RxTx_Data.Address;
-	Petit_CRC16_Calc(Petit_RxTx_Data.Address);
-	PetitBuffer[Petit_Tx_Buf_Size++] = Petit_RxTx_Data.Function;
-	Petit_CRC16_Calc(Petit_RxTx_Data.Function);
-	for (PetitBufIdx = 0; PetitBufIdx < Petit_RxTx_Data.DataLen;
+	for (PetitBufIdx = 0; PetitBufIdx < PetitBufProcIdx;
 			PetitBufIdx++)
 	{
-		PetitBuffer[Petit_Tx_Buf_Size++] =
-				Petit_RxTx_Data.DataBuf[PetitBufIdx];
-		Petit_CRC16_Calc(Petit_RxTx_Data.DataBuf[PetitBufIdx]);
+		Petit_CRC16_Calc(PetitBuffer[PetitBufIdx]);
 	}
 
-	PetitBuffer[Petit_Tx_Buf_Size++] = Petit_CRC16;
-	PetitBuffer[Petit_Tx_Buf_Size++] = Petit_CRC16 >> 8;
+	PetitBuffer[PetitBufIdx++] = Petit_CRC16;
+	PetitBuffer[PetitBufIdx++] = Petit_CRC16 >> 8;
 
 	Petit_Ptr = &(PetitBuffer[0]);
 
@@ -392,7 +364,7 @@ void Petit_TxRTU(void)
 void Petit_ResponseProcess(void)
 {
 	// Data is for us but which function?
-	switch (Petit_RxTx_Data.Function)
+	switch (PetitBuffer[1])
 	{
 #if PETITMODBUS_READ_HOLDING_REGISTERS_ENABLED > 0
 	case PETITMODBUS_READ_HOLDING_REGISTERS:
@@ -444,8 +416,8 @@ void ProcessPetitModbus(void)
 		{
 			// print first character to start UART peripheral
 			Petit_RxTx_State = PETIT_RXTX_TX;
-			PetitPortUartBegin(*Petit_Ptr++);
-			Petit_Tx_Buf_Size--;
+			PetitPortTxBegin(*Petit_Ptr++);
+			PetitBufIdx--;
 		}
 		break;
 	case PETIT_RXTX_TX:
