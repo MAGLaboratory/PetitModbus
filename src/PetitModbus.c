@@ -36,23 +36,20 @@ PETIT_RXTX_STATE Petit_RxTx_State = PETIT_RXTX_RX;
 unsigned char PetitRxTxBuffer[PETITMODBUS_RXTX_BUFFER_SIZE];
 unsigned int Petit_CRC16 = 0xFFFF;
 PETIT_RXTX_DATA Petit_RxTx_Data;
+unsigned int PetitBufCurrent = 0;
 
 unsigned int Petit_Tx_Delay = 0;
-unsigned int Petit_Tx_Current = 0;
 unsigned char *Petit_Tx_Ptr = &PetitRxTxBuffer[0];
 unsigned int Petit_Tx_Buf_Size = 0;
 
 unsigned char *Petit_Rx_Ptr = &PetitRxTxBuffer[0];
-unsigned int PetitRxRemaining = PETITMODBUS_RXTX_BUFFER_SIZE;
-unsigned int PetitRxCounter = 0;
 
-unsigned char PetitExpectedReceiveCount = 0;
+unsigned int PetitExpectedReceiveCount = 0;
 /*************************************************k****************************/
 
 void PetitRxBufferReset()
 {
-	PetitRxCounter = 0;
-	PetitRxRemaining = PETITMODBUS_RXTX_BUFFER_SIZE;
+	PetitBufCurrent = 0;
 	Petit_Rx_Ptr = &(PetitRxTxBuffer[0]);
 	PetitExpectedReceiveCount = 0;
 	return;
@@ -60,11 +57,11 @@ void PetitRxBufferReset()
 
 unsigned char PetitRxBufferInsert(unsigned char rcvd)
 {
-	if (PetitRxRemaining && Petit_RxTx_State == PETIT_RXTX_RX)
+	if (PetitBufCurrent < PETITMODBUS_RXTX_BUFFER_SIZE
+			&& Petit_RxTx_State == PETIT_RXTX_RX)
 	{
 		*Petit_Rx_Ptr++ = rcvd;
-		PetitRxRemaining--;
-		PetitRxCounter++;
+		PetitBufCurrent++;
 		PetitPortTimerStart();
 		return 0;
 	}
@@ -82,6 +79,7 @@ unsigned char PetitTxBufferPop(unsigned char* tx)
 	// transmission complete.  return to receive mode.
 	// the direction pin is handled by the porting code
 	Petit_RxTx_State = PETIT_RXTX_RX;
+	PetitBufCurrent = 0;
 	return 0;
 }
 
@@ -104,7 +102,7 @@ void Petit_CRC16_Calc(unsigned char Data)
  */
 unsigned char PetitSendMessage(void)
 {
-	Petit_Tx_Current = 0;
+	PetitBufCurrent = 0;
 	Petit_RxTx_State = PETIT_RXTX_TX_DATABUF;
 
 	return TRUE;
@@ -269,12 +267,12 @@ void HandleMPetitodbusWriteMultipleRegisters(void)
  */
 unsigned char CheckPetitModbusBufferComplete(void)
 {
-	if (PetitRxCounter > 0 && PetitRxTxBuffer[0] != PETITMODBUS_SLAVE_ADDRESS)
+	if (PetitBufCurrent > 0 && PetitRxTxBuffer[0] != PETITMODBUS_SLAVE_ADDRESS)
 	{
 		return PETIT_FALSE_SLAVE_ADDRESS;
 	}
 
-	if (PetitRxCounter > 6 && PetitExpectedReceiveCount == 0)
+	if (PetitBufCurrent > 6 && PetitExpectedReceiveCount == 0)
 	{
 		if (PetitRxTxBuffer[1] >= 0x01 && PetitRxTxBuffer[1] <= 0x06)  // RHR
 		{
@@ -295,7 +293,7 @@ unsigned char CheckPetitModbusBufferComplete(void)
 	}
 
 	if (PetitExpectedReceiveCount
-			&& PetitRxCounter >= PetitExpectedReceiveCount)
+			&& PetitBufCurrent >= PetitExpectedReceiveCount)
 	{
 		return PETIT_DATA_READY;
 	}
@@ -371,12 +369,12 @@ void Petit_TxRTU(void)
 	Petit_CRC16_Calc(Petit_RxTx_Data.Address);
 	PetitRxTxBuffer[Petit_Tx_Buf_Size++] = Petit_RxTx_Data.Function;
 	Petit_CRC16_Calc(Petit_RxTx_Data.Function);
-	for (Petit_Tx_Current = 0; Petit_Tx_Current < Petit_RxTx_Data.DataLen;
-			Petit_Tx_Current++)
+	for (PetitBufCurrent = 0; PetitBufCurrent < Petit_RxTx_Data.DataLen;
+			PetitBufCurrent++)
 	{
 		PetitRxTxBuffer[Petit_Tx_Buf_Size++] =
-				Petit_RxTx_Data.DataBuf[Petit_Tx_Current];
-		Petit_CRC16_Calc(Petit_RxTx_Data.DataBuf[Petit_Tx_Current]);
+				Petit_RxTx_Data.DataBuf[PetitBufCurrent];
+		Petit_CRC16_Calc(Petit_RxTx_Data.DataBuf[PetitBufCurrent]);
 	}
 
 	PetitRxTxBuffer[Petit_Tx_Buf_Size++] = Petit_CRC16;

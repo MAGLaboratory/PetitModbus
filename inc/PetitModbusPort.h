@@ -14,7 +14,7 @@
 #define TRUE (1)
 #endif
 
-// functions for porting
+// functions to be defined for porting
 extern void PetitPortUartBegin(unsigned char tx);
 extern void PetitPortTimerStart(void);
 extern void PetitPortTimerStop(void);
