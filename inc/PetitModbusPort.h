@@ -5,7 +5,7 @@
 #ifndef __PETIT_MODBUS_PORT_H__
 #define __PETIT_MODBUS_PORT_H__
 
-#include "PetitModbus.h"
+#include "PetitModbusUserPort.h"
 
 #ifndef FALSE
 #define FALSE (0)
@@ -13,6 +13,10 @@
 #ifndef TRUE
 #define TRUE (1)
 #endif
+
+typedef short PetitRegStructure;
+extern PetitRegStructure    PetitRegisters[NUMBER_OF_OUTPUT_PETITREGISTERS];
+extern unsigned char PetitRegChange;
 
 // functions to be defined for porting
 extern void PetitPortTxBegin(unsigned char tx);

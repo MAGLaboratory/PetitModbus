@@ -1,27 +1,30 @@
 #include "PetitModbus.h"
 
 /*******************************ModBus Functions*******************************/
-#define PETITMODBUS_READ_COILS                  1
-#define PETITMODBUS_READ_DISCRETE_INPUTS        2
-#define PETITMODBUS_READ_HOLDING_REGISTERS      3
-#define PETITMODBUS_READ_INPUT_REGISTERS        4
-#define PETITMODBUS_WRITE_SINGLE_COIL           5
-#define PETITMODBUS_WRITE_SINGLE_REGISTER       6
-#define PETITMODBUS_WRITE_MULTIPLE_COILS        15
-#define PETITMODBUS_WRITE_MULTIPLE_REGISTERS    16
+#define PETITMODBUS_READ_COILS                  (1)
+#define PETITMODBUS_READ_DISCRETE_INPUTS        (2)
+#define PETITMODBUS_READ_HOLDING_REGISTERS      (3)
+#define PETITMODBUS_READ_INPUT_REGISTERS        (4)
+#define PETITMODBUS_WRITE_SINGLE_COIL           (5)
+#define PETITMODBUS_WRITE_SINGLE_REGISTER       (6)
+#define PETITMODBUS_WRITE_MULTIPLE_COILS        (15)
+#define PETITMODBUS_WRITE_MULTIPLE_REGISTERS    (16)
 /****************************End of ModBus Functions***************************/
 
-#define PETIT_FALSE_FUNCTION                    0
-#define PETIT_FALSE_SLAVE_ADDRESS               1
-#define PETIT_DATA_NOT_READY                    2
-#define PETIT_DATA_READY                        3
+#define PETIT_FALSE_FUNCTION                    (0)
+#define PETIT_FALSE_SLAVE_ADDRESS               (1)
+#define PETIT_DATA_NOT_READY                    (2)
+#define PETIT_DATA_READY                        (3)
 
-#define PETIT_ERROR_CODE_01                     0x01                            // Function code is not supported
-#define PETIT_ERROR_CODE_02                     0x02                            // Register address is not allowed or write-protected
-
+#define PETIT_ERROR_CODE_01                     (0x01)                            // Function code is not supported
+#define PETIT_ERROR_CODE_02                     (0x02)                            // Register address is not allowed or write-protected
+#define PETIT_BUF_FN_CODE_I 					(1)
+#define PETIT_BUF_BYTE_CNT_I                    (6)
+#define PETIT_BUF_DAT_M(Idx) (((unsigned int)(PetitBuffer[2*(Idx) + 2]) << 8) \
+			| (unsigned int) (PetitBuffer[2*(Idx) + 3]))
 unsigned char PETITMODBUS_SLAVE_ADDRESS = 1;
 
-extern code const unsigned short PetitCRCtable[];
+extern PETIT_CODE const unsigned short PetitCRCtable[];
 
 /**********************Slave Transmit and Receive Variables********************/
 PETIT_RXTX_STATE Petit_RxTx_State = PETIT_RXTX_RX;
@@ -77,13 +80,32 @@ unsigned char PetitTxBufferPop(unsigned char* tx)
  * @param[in]           : Data
  * @How to use          : initialize Petit_CRC16 to 0xFFFF beforehand
  */
-void Petit_CRC16_Calc(unsigned char Data)
+#if PETIT_CRC == PETIT_CRC_TABULAR
+void Petit_CRC16_Calc(const unsigned char Data)
 {
 	Petit_CRC16 = (Petit_CRC16 >> 8) ^
 			PetitCRCtable[(Petit_CRC16 ^ (Data)) & 0xFF];
 	return;
 }
+#elif PETIT_CRC == PETIT_CRC_BITWISE
+void Petit_CRC16_Calc(const unsigned char Data)
+{
+	unsigned char i;
 
+    Petit_CRC16 = Petit_CRC16 ^(unsigned int) Data;
+    for (i = 8; i > 0; i--)
+    {
+        if (Petit_CRC16 & 0x0001)
+            Petit_CRC16 = (Petit_CRC16 >> 1) ^ 0xA001;
+        else
+            Petit_CRC16 >>= 1;
+    }
+}
+#elif PETIT_CRC == PETIT_CRC_EXTERNAL
+#define Petit_CRC16_Calc(Data) PetitPortCRC16Calc((Data), &Petit_CRC16)
+#else
+#error "No Valid CRC Algorithm!"
+#endif
 /*
  * Function Name        : SendMessage
  * @param[out]          : TRUE/FALSE
@@ -106,7 +128,7 @@ unsigned char PetitSendMessage(void)
 void HandlePetitModbusError(char ErrorCode)
 {
 	// Initialise the output buffer. The first byte in the buffer says how many registers we have read
-	PetitBuffer[1] |= 0x80;
+	PetitBuffer[PETIT_BUF_FN_CODE_I] |= 0x80;
 	PetitBuffer[2] = ErrorCode;
 	PetitBufProcIdx = 3;
 	PetitSendMessage();
@@ -129,10 +151,8 @@ void HandlePetitModbusReadHoldingRegisters(void)
 	unsigned int Petit_i = 0;
 
 	// The message contains the requested start address and number of registers
-	Petit_StartAddress = ((unsigned int) (PetitBuffer[2]) << 8)
-			+ (unsigned int) (PetitBuffer[3]);
-	Petit_NumberOfRegisters = ((unsigned int) (PetitBuffer[4]) << 8)
-			+ (unsigned int) (PetitBuffer[5]);
+	Petit_StartAddress = PETIT_BUF_DAT_M(0);
+	Petit_NumberOfRegisters = PETIT_BUF_DAT_M(1);
 
 	// If it is bigger than RegisterNumber return error to Modbus Master
 	if ((Petit_StartAddress + Petit_NumberOfRegisters)
@@ -140,7 +160,8 @@ void HandlePetitModbusReadHoldingRegisters(void)
 		HandlePetitModbusError(PETIT_ERROR_CODE_02);
 	else
 	{
-		// Initialise the output buffer. The first byte in the buffer says how many registers we have read
+		// Initialise the output buffer.
+		// The first byte in the PDU says how many registers we have read
 		PetitBufProcIdx = 3;
 		PetitBuffer[2] = 0;
 
@@ -177,10 +198,8 @@ void HandlePetitModbusWriteSingleRegister(void)
 	unsigned char Petit_i = 0;
 
 	// The message contains the requested start address and number of registers
-	Petit_Address = ((unsigned int) (PetitBuffer[2]) << 8)
-			+ (unsigned int) (PetitBuffer[3]);
-	Petit_Value = ((unsigned int) (PetitBuffer[4]) << 8)
-			+ (unsigned int) (PetitBuffer[5]);
+	Petit_Address = PETIT_BUF_DAT_M(0);
+	Petit_Value = PETIT_BUF_DAT_M(1);
 
 	// Initialise the output buffer. The first byte in the buffer says how many registers we have read
 	PetitBufProcIdx = 6;
@@ -215,11 +234,9 @@ void HandleMPetitodbusWriteMultipleRegisters(void)
 	unsigned int Petit_Value = 0;
 
 	// The message contains the requested start address and number of registers
-	Petit_StartAddress = ((unsigned int) (PetitBuffer[2]) << 8)
-			+ (unsigned int) (PetitBuffer[3]);
-	Petit_NumberOfRegisters = ((unsigned int) (PetitBuffer[4]) << 8)
-			+ (unsigned int) (PetitBuffer[5]);
-	Petit_ByteCount = PetitBuffer[6];
+	Petit_StartAddress = PETIT_BUF_DAT_M(0);
+	Petit_NumberOfRegisters = PETIT_BUF_DAT_M(1);
+	Petit_ByteCount = PetitBuffer[PETIT_BUF_BYTE_CNT_I];
 
 	// If it is bigger than RegisterNumber return error to Modbus Master
 	if ((Petit_StartAddress + Petit_NumberOfRegisters)
@@ -233,8 +250,9 @@ void HandleMPetitodbusWriteMultipleRegisters(void)
 		// Output data buffer is exact copy of input buffer
 		for (Petit_i = 0; Petit_i < Petit_NumberOfRegisters; Petit_i++)
 		{
-			Petit_Value = (PetitBuffer[7 + 2 * Petit_i] << 8)
-					+ (PetitBuffer[8 + 2 * Petit_i]);
+			// 7 is the index beyond the header for the function
+			Petit_Value = (PetitBuffer[2*Petit_i + 7] << 8)
+					| (PetitBuffer[2*Petit_i + 8]);
 			PetitRegisters[Petit_StartAddress + Petit_i] = Petit_Value;
 		}
 
@@ -263,13 +281,15 @@ unsigned char CheckPetitModbusBufferComplete(void)
 
 	if (PetitBufIdx > 6 && PetitExpectedReceiveCount == 0)
 	{
-		if (PetitBuffer[1] >= 0x01 && PetitBuffer[1] <= 0x06)  // RHR
+		if (PetitBuffer[PETIT_BUF_FN_CODE_I] >= 0x01
+				&& PetitBuffer[PETIT_BUF_FN_CODE_I] <= 0x06)  // RHR
 		{
 			PetitExpectedReceiveCount = 8;
 		}
-		else if (PetitBuffer[1] == 0x0F || PetitBuffer[1] == 0x10)
+		else if (PetitBuffer[PETIT_BUF_FN_CODE_I] == 0x0F
+				|| PetitBuffer[PETIT_BUF_FN_CODE_I] == 0x10)
 		{
-			PetitExpectedReceiveCount = PetitBuffer[6] + 9;
+			PetitExpectedReceiveCount = PetitBuffer[PETIT_BUF_BYTE_CNT_I] + 9;
 			if (PetitExpectedReceiveCount > PETITMODBUS_RXTX_BUFFER_SIZE)
 			{
 				return PETIT_FALSE_FUNCTION;
@@ -307,18 +327,16 @@ void Petit_RxRTU(void)
 		// disable timeout
 		PetitPortTimerStop();
 
-		// CRC check
+		// CRC calculate
 		Petit_CRC16 = 0xFFFF;
-		PetitBufProcIdx = PetitExpectedReceiveCount;
-		PetitBufProcIdx -= 2;
+		// subtract two to skip the CRC in the ADU
+		PetitBufProcIdx = PetitExpectedReceiveCount - 2;
 		for (Petit_i = 0; Petit_i < PetitBufProcIdx; ++Petit_i)
 		{
 			Petit_CRC16_Calc(PetitBuffer[Petit_i]);
 		}
 
 		PetitRxBufferReset();
-
-		// allow LSB read
 		if (((unsigned int) PetitBuffer[PetitBufProcIdx]
 				+ ((unsigned int) PetitBuffer[PetitBufProcIdx
 						+ 1] << 8)) == Petit_CRC16)
@@ -364,7 +382,7 @@ void Petit_TxRTU(void)
 void Petit_ResponseProcess(void)
 {
 	// Data is for us but which function?
-	switch (PetitBuffer[1])
+	switch (PetitBuffer[PETIT_BUF_FN_CODE_I])
 	{
 #if PETITMODBUS_READ_HOLDING_REGISTERS_ENABLED > 0
 	case PETITMODBUS_READ_HOLDING_REGISTERS:
@@ -398,10 +416,10 @@ void ProcessPetitModbus(void)
 {
 	switch (Petit_RxTx_State)
 	{
-#if PETITMODBUS_PROCESS_POSITION > 1
+#if PETITMODBUS_PROCESS_POSITION >= 1
 	case PETIT_RXTX_RX_PROCESS:
 		Petit_ResponseProcess();
-		// no break here.  Position 2 blends it with TxRTU.
+		// no break here.  Position 1 blends processing with TxRTU.
 #endif
 	case PETIT_RXTX_TX_DATABUF: // if the answer is ready, send it
 		Petit_TxRTU();
@@ -423,20 +441,14 @@ void ProcessPetitModbus(void)
 	case PETIT_RXTX_TX:
 		// no work is done here.  wait until transmission completes.
 		break;
-#if PETITMODBUS_PROCESS_POSITION == 1
+	// position 0 has the RX process on its own.
+#if PETITMODBUS_PROCESS_POSITION <= 0
 	case PETIT_RXTX_RX_PROCESS:
 		Petit_ResponseProcess();
 		break;
 #endif
 	default:
 		Petit_RxRTU();
-
-#if PETITMODBUS_PROCESS_POSITION <= 0
-		if (Petit_RxTx_State == PETIT_RXTX_RX_PROCESS)
-		{
-			Petit_ResponseProcess();
-		}
-#endif
 		break;
 	}
 }
