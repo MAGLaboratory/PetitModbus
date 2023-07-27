@@ -24,19 +24,17 @@
 			| (unsigned int) (PetitBuffer[2*(Idx) + 3]))
 unsigned char PETITMODBUS_SLAVE_ADDRESS = 1;
 
-extern PETIT_CODE const unsigned short PetitCRCtable[];
-
 /**********************Slave Transmit and Receive Variables********************/
 PETIT_RXTX_STATE Petit_RxTx_State = PETIT_RXTX_RX;
 unsigned char PetitBuffer[PETITMODBUS_RXTX_BUFFER_SIZE];
-unsigned int Petit_CRC16 = 0xFFFF;
-unsigned int PetitBufIdx = 0;
+unsigned short Petit_CRC16 = 0xFFFF;
+unsigned short PetitBufIdx = 0;
+unsigned short PetitBufProcIdx = 0;
 unsigned char *Petit_Ptr = &PetitBuffer[0];
-unsigned int PetitBufProcIdx = 0;
 
-unsigned int Petit_Tx_Delay = 0;
+unsigned short Petit_Tx_Delay = 0;
 
-unsigned int PetitExpectedReceiveCount = 0;
+unsigned short PetitExpectedReceiveCount = 0;
 /*************************************************k****************************/
 
 void PetitRxBufferReset()
@@ -167,9 +165,15 @@ void HandlePetitModbusReadHoldingRegisters(void)
 
 		for (Petit_i = 0; Petit_i < Petit_NumberOfRegisters; Petit_i++)
 		{
-			unsigned short Petit_CurrentData = PetitRegisters[Petit_StartAddress
+			unsigned short Petit_CurrentData;
+#if defined(PETIT_REG) && \
+	(PETIT_REG == PETIT_REG_INTERNAL || PETIT_REG == PETIT_REG_BOTH)
+			Petit_CurrentData = PetitRegisters[Petit_StartAddress
 					+ Petit_i];
-
+#endif
+#if defined(PETIT_REG) && PETIT_REG == PETIT_REG_EXTERNAL
+			Petit_CurrentData = PetitPortRegRead(Petit_StartAddress + Petit_i);
+#endif
 			PetitBuffer[PetitBufProcIdx] =
 					(unsigned char) ((Petit_CurrentData & 0xFF00) >> 8);
 			PetitBuffer[PetitBufProcIdx + 1] =
@@ -208,7 +212,13 @@ void HandlePetitModbusWriteSingleRegister(void)
 		HandlePetitModbusError(PETIT_ERROR_CODE_02);
 	else
 	{
+#if defined(PETIT_REG) && \
+		(PETIT_REG == PETIT_REG_INTERNAL || PETIT_REG == PETIT_REG_BOTH)
 		PetitRegisters[Petit_Address] = Petit_Value;
+#endif
+#if defined(PETIT_REG) && PETIT_REG == PETIT_REG_EXTERNAL
+		PetitPortRegWrite(Petit_Address, Petit_Value);
+#endif
 		// Output data buffer is exact copy of input buffer
 		PetitRegChange = 1;
 	}
@@ -253,7 +263,13 @@ void HandleMPetitodbusWriteMultipleRegisters(void)
 			// 7 is the index beyond the header for the function
 			Petit_Value = (PetitBuffer[2*Petit_i + 7] << 8)
 					| (PetitBuffer[2*Petit_i + 8]);
+#if defined(PETIT_REG) && \
+		(PETIT_REG == PETIT_REG_INTERNAL || PETIT_REG == PETIT_REG_BOTH)
 			PetitRegisters[Petit_StartAddress + Petit_i] = Petit_Value;
+#endif
+#if defined(PETIT_REG) && PETIT_REG == PETIT_REG_EXTERNAL
+			PetitPortRegWrite(Petit_Address, Petit_Value);
+#endif
 		}
 
 		PetitRegChange = 1;
@@ -342,7 +358,7 @@ void Petit_RxRTU(void)
 						+ 1] << 8)) == Petit_CRC16)
 		{
 			// Valid message!
-			Petit_RxTx_State = PETIT_RXTX_RX_PROCESS;
+			Petit_RxTx_State = PETIT_RXTX_PROCESS;
 		}
 		else
 		{
@@ -417,7 +433,7 @@ void ProcessPetitModbus(void)
 	switch (Petit_RxTx_State)
 	{
 #if PETITMODBUS_PROCESS_POSITION >= 1
-	case PETIT_RXTX_RX_PROCESS:
+	case PETIT_RXTX_PROCESS:
 		Petit_ResponseProcess();
 		// no break here.  Position 1 blends processing with TxRTU.
 #endif
@@ -443,7 +459,7 @@ void ProcessPetitModbus(void)
 		break;
 	// position 0 has the RX process on its own.
 #if PETITMODBUS_PROCESS_POSITION <= 0
-	case PETIT_RXTX_RX_PROCESS:
+	case PETIT_RXTX_PROCESS:
 		Petit_ResponseProcess();
 		break;
 #endif

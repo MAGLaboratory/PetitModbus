@@ -1,4 +1,4 @@
-#include "PetitModbusUserPort.h"
+#include "PetitModbusPort.h"
 
 #if PETIT_CRC == PETIT_CRC_TABULAR
 PETIT_CODE const short PetitCRCtable[256] = {

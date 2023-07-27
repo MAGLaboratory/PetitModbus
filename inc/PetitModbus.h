@@ -15,17 +15,20 @@
 // Buffers for Petit Modbus RTU Slave
 // sized to hold a write to all registers
 // +2 address; +2 number of registers; +1 number of bytes to follow; +2 CRC16
-#define PETITMODBUS_RXTX_DATA_SIZE                 (NUMBER_OF_OUTPUT_PETITREGISTERS*2 + 7)
-// last offset, +1 slave address; +1 function
-#define PETITMODBUS_RXTX_BUFFER_SIZE               (NUMBER_OF_OUTPUT_PETITREGISTERS*2 + 9)
+// +1 slave address; +1 function
+#define PETITMODBUS_RXTX_BUFFER_SIZE  (2*(NUMBER_OF_OUTPUT_PETITREGISTERS) + 9)
 
 // Variable for Slave Address
 extern unsigned char PETITMODBUS_SLAVE_ADDRESS;                                 // Petit Modbus RTU Slave icin adres numarasi [0 to 255]
 
+#if PETIT_CRC == PETIT_CRC_TABULAR
+extern PETIT_CODE const short PetitCRCtable[];
+#endif
+
 typedef enum
 {
     PETIT_RXTX_RX = 0,
-	PETIT_RXTX_RX_PROCESS,
+	PETIT_RXTX_PROCESS,
     PETIT_RXTX_TX_DATABUF,
 	PETIT_RXTX_TX_DLY,
     PETIT_RXTX_TX,
