@@ -28,8 +28,11 @@ unsigned char PETITMODBUS_SLAVE_ADDRESS = 1;
 PETIT_RXTX_STATE Petit_RxTx_State = PETIT_RXTX_RX;
 unsigned char PetitBuffer[PETITMODBUS_RXTX_BUFFER_SIZE];
 unsigned short Petit_CRC16 = 0xFFFF;
-unsigned short PetitBufIdx = 0;
-unsigned short PetitBufProcIdx = 0;
+// of the two, PetitBufI is used more for RX validation and TX
+// PetitBufJ is used more for internal processing
+unsigned short PetitBufI = 0;
+unsigned short PetitBufJ = 0;
+
 unsigned char *Petit_Ptr = &PetitBuffer[0];
 
 unsigned short Petit_Tx_Delay = 0;
@@ -39,7 +42,7 @@ unsigned short PetitExpectedReceiveCount = 0;
 
 void PetitRxBufferReset()
 {
-	PetitBufIdx = 0;
+	PetitBufI = 0;
 	Petit_Ptr = &(PetitBuffer[0]);
 	PetitExpectedReceiveCount = 0;
 	return;
@@ -47,11 +50,11 @@ void PetitRxBufferReset()
 
 unsigned char PetitRxBufferInsert(unsigned char rcvd)
 {
-	if (PetitBufIdx < PETITMODBUS_RXTX_BUFFER_SIZE
+	if (PetitBufI < PETITMODBUS_RXTX_BUFFER_SIZE
 			&& Petit_RxTx_State == PETIT_RXTX_RX)
 	{
 		*Petit_Ptr++ = rcvd;
-		PetitBufIdx++;
+		PetitBufI++;
 		PetitPortTimerStart();
 		return 0;
 	}
@@ -60,16 +63,23 @@ unsigned char PetitRxBufferInsert(unsigned char rcvd)
 
 unsigned char PetitTxBufferPop(unsigned char* tx)
 {
-	if (Petit_RxTx_State == PETIT_RXTX_TX && PetitBufIdx != 0)
+	if (Petit_RxTx_State == PETIT_RXTX_TX)
 	{
-		*tx = *Petit_Ptr++;
-		PetitBufIdx--;
-		return 1;
+		if (PetitBufI != 0)
+		{
+			*tx = *Petit_Ptr++;
+			PetitBufI--;
+			return 1;
+		}
+		else
+		{
+			// transmission complete.  return to receive mode.
+			// the direction pin is handled by the porting code
+			Petit_RxTx_State = PETIT_RXTX_RX;
+			Petit_Ptr = &(PetitBuffer[0]);
+			return 0;
+		}
 	}
-	// transmission complete.  return to receive mode.
-	// the direction pin is handled by the porting code
-	Petit_RxTx_State = PETIT_RXTX_RX;
-	Petit_Ptr = &(PetitBuffer[0]);
 	return 0;
 }
 
@@ -111,7 +121,7 @@ void Petit_CRC16_Calc(const unsigned char Data)
  */
 unsigned char PetitSendMessage(void)
 {
-	PetitBufIdx = 0;
+	PetitBufI = 0;
 	Petit_RxTx_State = PETIT_RXTX_TX_DATABUF;
 
 	return TRUE;
@@ -128,7 +138,7 @@ void HandlePetitModbusError(char ErrorCode)
 	// Initialise the output buffer. The first byte in the buffer says how many registers we have read
 	PetitBuffer[PETIT_BUF_FN_CODE_I] |= 0x80;
 	PetitBuffer[2] = ErrorCode;
-	PetitBufProcIdx = 3;
+	PetitBufJ = 3;
 	PetitSendMessage();
 }
 
@@ -154,13 +164,14 @@ void HandlePetitModbusReadHoldingRegisters(void)
 
 	// If it is bigger than RegisterNumber return error to Modbus Master
 	if ((Petit_StartAddress + Petit_NumberOfRegisters)
-			> NUMBER_OF_OUTPUT_PETITREGISTERS)
+			> NUMBER_OF_OUTPUT_PETITREGISTERS ||
+			Petit_NumberOfRegisters > NUMBER_OF_REGISTERS_IN_BUFFER)
 		HandlePetitModbusError(PETIT_ERROR_CODE_02);
 	else
 	{
 		// Initialise the output buffer.
 		// The first byte in the PDU says how many registers we have read
-		PetitBufProcIdx = 3;
+		PetitBufJ = 3;
 		PetitBuffer[2] = 0;
 
 		for (Petit_i = 0; Petit_i < Petit_NumberOfRegisters; Petit_i++)
@@ -174,13 +185,13 @@ void HandlePetitModbusReadHoldingRegisters(void)
 #if defined(PETIT_REG) && PETIT_REG == PETIT_REG_EXTERNAL
 			Petit_CurrentData = PetitPortRegRead(Petit_StartAddress + Petit_i);
 #endif
-			PetitBuffer[PetitBufProcIdx] =
+			PetitBuffer[PetitBufJ] =
 					(unsigned char) ((Petit_CurrentData & 0xFF00) >> 8);
-			PetitBuffer[PetitBufProcIdx + 1] =
+			PetitBuffer[PetitBufJ + 1] =
 					(unsigned char) (Petit_CurrentData & 0xFF);
-			PetitBufProcIdx += 2;
+			PetitBufJ += 2;
 		}
-		PetitBuffer[2] = PetitBufProcIdx - 3;
+		PetitBuffer[2] = PetitBufJ - 3;
 
 		PetitSendMessage();
 	}
@@ -206,7 +217,7 @@ void HandlePetitModbusWriteSingleRegister(void)
 	Petit_Value = PETIT_BUF_DAT_M(1);
 
 	// Initialise the output buffer. The first byte in the buffer says how many registers we have read
-	PetitBufProcIdx = 6;
+	PetitBufJ = 6;
 
 	if (Petit_Address >= NUMBER_OF_OUTPUT_PETITREGISTERS)
 		HandlePetitModbusError(PETIT_ERROR_CODE_02);
@@ -255,7 +266,7 @@ void HandleMPetitodbusWriteMultipleRegisters(void)
 	else
 	{
 		// Initialise the output buffer. The first byte in the buffer says how many outputs we have set
-		PetitBufProcIdx = 6;
+		PetitBufJ = 6;
 
 		// Output data buffer is exact copy of input buffer
 		for (Petit_i = 0; Petit_i < Petit_NumberOfRegisters; Petit_i++)
@@ -290,12 +301,12 @@ void HandleMPetitodbusWriteMultipleRegisters(void)
  */
 unsigned char CheckPetitModbusBufferComplete(void)
 {
-	if (PetitBufIdx > 0 && PetitBuffer[0] != PETITMODBUS_SLAVE_ADDRESS)
+	if (PetitBufI > 0 && PetitBuffer[0] != PETITMODBUS_SLAVE_ADDRESS)
 	{
 		return PETIT_FALSE_SLAVE_ADDRESS;
 	}
 
-	if (PetitBufIdx > 6 && PetitExpectedReceiveCount == 0)
+	if (PetitBufI > 6 && PetitExpectedReceiveCount == 0)
 	{
 		if (PetitBuffer[PETIT_BUF_FN_CODE_I] >= 0x01
 				&& PetitBuffer[PETIT_BUF_FN_CODE_I] <= 0x06)  // RHR
@@ -318,7 +329,7 @@ unsigned char CheckPetitModbusBufferComplete(void)
 	}
 
 	if (PetitExpectedReceiveCount
-			&& PetitBufIdx >= PetitExpectedReceiveCount)
+			&& PetitBufI >= PetitExpectedReceiveCount)
 	{
 		return PETIT_DATA_READY;
 	}
@@ -346,15 +357,15 @@ void Petit_RxRTU(void)
 		// CRC calculate
 		Petit_CRC16 = 0xFFFF;
 		// subtract two to skip the CRC in the ADU
-		PetitBufProcIdx = PetitExpectedReceiveCount - 2;
-		for (Petit_i = 0; Petit_i < PetitBufProcIdx; ++Petit_i)
+		PetitBufJ = PetitExpectedReceiveCount - 2;
+		for (Petit_i = 0; Petit_i < PetitBufJ; ++Petit_i)
 		{
 			Petit_CRC16_Calc(PetitBuffer[Petit_i]);
 		}
 
 		PetitRxBufferReset();
-		if (((unsigned int) PetitBuffer[PetitBufProcIdx]
-				+ ((unsigned int) PetitBuffer[PetitBufProcIdx
+		if (((unsigned int) PetitBuffer[PetitBufJ]
+				+ ((unsigned int) PetitBuffer[PetitBufJ
 						+ 1] << 8)) == Petit_CRC16)
 		{
 			// Valid message!
@@ -376,14 +387,14 @@ void Petit_RxRTU(void)
 void Petit_TxRTU(void)
 {
 	Petit_CRC16 = 0xFFFF;
-	for (PetitBufIdx = 0; PetitBufIdx < PetitBufProcIdx;
-			PetitBufIdx++)
+	for (PetitBufI = 0; PetitBufI < PetitBufJ;
+			PetitBufI++)
 	{
-		Petit_CRC16_Calc(PetitBuffer[PetitBufIdx]);
+		Petit_CRC16_Calc(PetitBuffer[PetitBufI]);
 	}
 
-	PetitBuffer[PetitBufIdx++] = Petit_CRC16;
-	PetitBuffer[PetitBufIdx++] = Petit_CRC16 >> 8;
+	PetitBuffer[PetitBufI++] = Petit_CRC16;
+	PetitBuffer[PetitBufI++] = Petit_CRC16 >> 8;
 
 	Petit_Ptr = &(PetitBuffer[0]);
 
@@ -451,7 +462,7 @@ void ProcessPetitModbus(void)
 			// print first character to start UART peripheral
 			Petit_RxTx_State = PETIT_RXTX_TX;
 			PetitPortTxBegin(*Petit_Ptr++);
-			PetitBufIdx--;
+			PetitBufI--;
 		}
 		break;
 	case PETIT_RXTX_TX:
