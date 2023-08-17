@@ -16,7 +16,7 @@
 // sized to hold a write to all registers
 // +2 address; +2 number of registers; +1 number of bytes to follow; +2 CRC16
 // +1 slave address; +1 function
-#define PETITMODBUS_RXTX_BUFFER_SIZE  (2*(NUMBER_OF_OUTPUT_PETITREGISTERS) + 9)
+#define PETITMODBUS_RXTX_BUFFER_SIZE  (2*(NUMBER_OF_REGISTERS_IN_BUFFER) + 9)
 
 // Variable for Slave Address
 extern unsigned char PETITMODBUS_SLAVE_ADDRESS;                                 // Petit Modbus RTU Slave icin adres numarasi [0 to 255]

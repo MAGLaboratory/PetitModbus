@@ -18,6 +18,7 @@
 
 #define PETIT_ERROR_CODE_01                     (0x01)                            // Function code is not supported
 #define PETIT_ERROR_CODE_02                     (0x02)                            // Register address is not allowed or write-protected
+#define PETIT_ERROR_CODE_04						(0x04)
 #define PETIT_BUF_FN_CODE_I 					(1)
 #define PETIT_BUF_BYTE_CNT_I                    (6)
 #define PETIT_BUF_DAT_M(Idx) (((unsigned int)(PetitBuffer[2*(Idx) + 2]) << 8) \
@@ -183,7 +184,67 @@ void HandlePetitModbusReadHoldingRegisters(void)
 					+ Petit_i];
 #endif
 #if defined(PETIT_REG) && PETIT_REG == PETIT_REG_EXTERNAL
-			Petit_CurrentData = PetitPortRegRead(Petit_StartAddress + Petit_i);
+			if (!PetitPortRegRead(Petit_StartAddress + Petit_i, &Petit_CurrentData))
+			{
+				HandlePetitModbusError(PETIT_ERROR_CODE_04);
+				break;
+			}
+#endif
+			PetitBuffer[PetitBufJ] =
+					(unsigned char) ((Petit_CurrentData & 0xFF00) >> 8);
+			PetitBuffer[PetitBufJ + 1] =
+					(unsigned char) (Petit_CurrentData & 0xFF);
+			PetitBufJ += 2;
+		}
+		PetitBuffer[2] = PetitBufJ - 3;
+
+		PetitSendMessage();
+	}
+}
+#endif
+
+/*
+ * Function Name        : HandleModbusReadInputRegisters
+ * @How to use          : Modbus function 04 - Read holding registers
+ */
+#if PETITMODBUS_READ_INPUT_REGISTERS_ENABLED > 0
+void HandlePetitModbusReadInputRegisters(void)
+{
+	unsigned int Petit_StartAddress = 0;
+	unsigned int Petit_NumberOfRegisters = 0;
+	unsigned int Petit_i = 0;
+
+	// The message contains the requested start address and number of registers
+	Petit_StartAddress = PETIT_BUF_DAT_M(0);
+	Petit_NumberOfRegisters = PETIT_BUF_DAT_M(1);
+
+	// If it is bigger than RegisterNumber return error to Modbus Master
+	if ((Petit_StartAddress + Petit_NumberOfRegisters)
+			> NUMBER_OF_INPUT_PETITREGISTERS ||
+			Petit_NumberOfRegisters > NUMBER_OF_REGISTERS_IN_BUFFER)
+		HandlePetitModbusError(PETIT_ERROR_CODE_02);
+	else
+	{
+		// Initialise the output buffer.
+		// The first byte in the PDU says how many registers we have read
+		PetitBufJ = 3;
+		PetitBuffer[2] = 0;
+
+		for (Petit_i = 0; Petit_i < Petit_NumberOfRegisters; Petit_i++)
+		{
+			unsigned short Petit_CurrentData;
+#if defined(PETIT_INPUT_REG) && \
+	(PETIT_INPUT_REG == PETIT_INPUT_REG_INTERNAL ||\
+			PETIT_INPUT_REG == PETIT_INPUT_REG_BOTH)
+			Petit_CurrentData = PetitInputRegisters[Petit_StartAddress
+					+ Petit_i];
+#endif
+#if defined(PETIT_INPUT_REG) && PETIT_INPUT_REG == PETIT_INPUT_REG_EXTERNAL
+			if (!PetitPortInputRegRead(Petit_StartAddress + Petit_i, &Petit_CurrentData))
+			{
+				HandlePetitModbusError(PETIT_ERROR_CODE_04);
+				break;
+			}
 #endif
 			PetitBuffer[PetitBufJ] =
 					(unsigned char) ((Petit_CurrentData & 0xFF00) >> 8);
@@ -228,7 +289,11 @@ void HandlePetitModbusWriteSingleRegister(void)
 		PetitRegisters[Petit_Address] = Petit_Value;
 #endif
 #if defined(PETIT_REG) && PETIT_REG == PETIT_REG_EXTERNAL
-		PetitPortRegWrite(Petit_Address, Petit_Value);
+		if(!PetitPortRegWrite(Petit_Address, Petit_Value))
+		{
+			HandlePetitModbusError(PETIT_ERROR_CODE_04);
+			break;
+		}
 #endif
 		// Output data buffer is exact copy of input buffer
 		PetitRegChange = 1;
@@ -414,6 +479,10 @@ void Petit_ResponseProcess(void)
 #if PETITMODBUS_READ_HOLDING_REGISTERS_ENABLED > 0
 	case PETITMODBUS_READ_HOLDING_REGISTERS:
 		HandlePetitModbusReadHoldingRegisters();
+		break;
+#endif
+#if PETITMODBUS_READ_INPUT_REGISTERS_ENABLED > 0
+	case PETITMODBUS_READ_INPUT_REGISTERS:
 		break;
 #endif
 #if PETITMODBUSWRITE_SINGLE_REGISTER_ENABLED > 0
