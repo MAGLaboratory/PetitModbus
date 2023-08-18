@@ -21,6 +21,11 @@
 #define PETIT_REG_BOTH     (0x1222)
 #define PETIT_REG_EXTERNAL (0x2222)
 
+#define PETIT_INPUT_REG_INTERNAL (0x2333)
+#define PETIT_INPUT_REG_BOTH     (0x2222)
+#define PETIT_INPUT_REG_EXTERNAL (0x3222)
+
+
 // file with user-defined constants
 #include "PetitModbusUserPort.h"
 
@@ -32,7 +37,10 @@ extern unsigned char PetitTxBufferPop(unsigned char* tx);
 
 // data defined for porting
 typedef short PetitRegStructure;
-extern PetitRegStructure    PetitRegisters[NUMBER_OF_OUTPUT_PETITREGISTERS];
+#if defined(PETIT_REG) && \
+	(PETIT_REG == PETIT_REG_INTERNAL || PETIT_REG == PETIT_REG_BOTH)
+extern PetitRegStructure    PetitRegisters[NUMBER_OF_PETITREGISTERS];
+#endif
 extern unsigned char PetitRegChange;
 
 // functions to be defined for porting
@@ -47,7 +55,7 @@ extern void PetitPortCRC16Calc(unsigned char Data, unsigned short* CRC);
 
 #if defined(PETIT_REG) && \
 	(PETIT_REG == PETIT_REG_EXTERNAL || PETIT_REG == PETIT_REG_BOTH)
-extern unsigned short PetitPortRegRead(unsigned char Addr);
-extern void PetitPortRegWrite(unsigned char Addr, unsigned short Data);
+extern unsigned char PetitPortRegRead(unsigned char Addr, unsigned short* Data);
+extern unsigned char PetitPortRegWrite(unsigned char Addr, unsigned short Data);
 #endif
 #endif /* __PETIT_MODBUS_PORT_H__ */

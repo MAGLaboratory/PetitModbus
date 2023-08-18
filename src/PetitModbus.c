@@ -165,7 +165,7 @@ void HandlePetitModbusReadHoldingRegisters(void)
 
 	// If it is bigger than RegisterNumber return error to Modbus Master
 	if ((Petit_StartAddress + Petit_NumberOfRegisters)
-			> NUMBER_OF_OUTPUT_PETITREGISTERS ||
+			> NUMBER_OF_PETITREGISTERS ||
 			Petit_NumberOfRegisters > NUMBER_OF_REGISTERS_IN_BUFFER)
 		HandlePetitModbusError(PETIT_ERROR_CODE_02);
 	else
@@ -280,7 +280,7 @@ void HandlePetitModbusWriteSingleRegister(void)
 	// Initialise the output buffer. The first byte in the buffer says how many registers we have read
 	PetitBufJ = 6;
 
-	if (Petit_Address >= NUMBER_OF_OUTPUT_PETITREGISTERS)
+	if (Petit_Address >= NUMBER_OF_PETITREGISTERS)
 		HandlePetitModbusError(PETIT_ERROR_CODE_02);
 	else
 	{
@@ -326,7 +326,7 @@ void HandleMPetitodbusWriteMultipleRegisters(void)
 
 	// If it is bigger than RegisterNumber return error to Modbus Master
 	if ((Petit_StartAddress + Petit_NumberOfRegisters)
-			> NUMBER_OF_OUTPUT_PETITREGISTERS)
+			> NUMBER_OF_PETITREGISTERS)
 		HandlePetitModbusError(PETIT_ERROR_CODE_02);
 	else
 	{
