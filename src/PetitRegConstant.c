@@ -2,8 +2,15 @@
 #include "PetitModbusPort.h"
 
 /***********************Input/Output Coils and Registers***********************/
-#if ((PETITMODBUS_READ_HOLDING_REGISTERS_ENABLED > 0)|| (PETITMODBUSWRITE_SINGLE_REGISTER_ENABLED > 0) || (PETITMODBUS_WRITE_MULTIPLE_REGISTERS_ENABLED > 0))
-PetitRegStructure  PetitRegisters       [NUMBER_OF_PETITREGISTERS];
+#if defined(PETIT_REG) && \
+	(PETIT_REG == PETIT_REG_INTERNAL || PETIT_REG == PETIT_REG_BOTH)
+pu16_t  PetitRegisters       [NUMBER_OF_PETITREGISTERS];
+#endif
+
+#if defined(PETIT_INPUT_REG) && \
+		(PETIT_INPUT_REG == PETIT_REG_INTERNAL ||\
+				PETIT_INPUT_REG == PETIT_REG_BOTH)
+pu16_t PetitInputRegisters [NUMBER_OF_INPUT_PETITREGISTERS];
 #endif
 
 unsigned char PetitRegChange = 0;

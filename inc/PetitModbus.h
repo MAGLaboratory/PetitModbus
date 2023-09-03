@@ -18,9 +18,6 @@
 // +1 slave address; +1 function
 #define PETITMODBUS_RXTX_BUFFER_SIZE  (2*(NUMBER_OF_REGISTERS_IN_BUFFER) + 9)
 
-// Variable for Slave Address
-extern unsigned char PETITMODBUS_SLAVE_ADDRESS;                                 // Petit Modbus RTU Slave icin adres numarasi [0 to 255]
-
 #if PETIT_CRC == PETIT_CRC_TABULAR
 extern PETIT_CODE const short PetitCRCtable[];
 #endif
@@ -34,6 +31,8 @@ typedef enum
     PETIT_RXTX_TX,
     PETIT_RXTX_TIMEOUT
 }  PETIT_RXTX_STATE;
+
+extern PETIT_RXTX_STATE Petit_RxTx_State;
 
 // Main Functions
 extern void                  ProcessPetitModbus(void);

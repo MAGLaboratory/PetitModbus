@@ -21,24 +21,23 @@
 #define PETIT_ERROR_CODE_04						(0x04)
 #define PETIT_BUF_FN_CODE_I 					(1)
 #define PETIT_BUF_BYTE_CNT_I                    (6)
-#define PETIT_BUF_DAT_M(Idx) (((unsigned int)(PetitBuffer[2*(Idx) + 2]) << 8) \
-			| (unsigned int) (PetitBuffer[2*(Idx) + 3]))
-unsigned char PETITMODBUS_SLAVE_ADDRESS = 1;
+#define PETIT_BUF_DAT_M(Idx) (((pu16_t)(PetitBuffer[2*(Idx) + 2]) << 8) \
+			| (pu16_t) (PetitBuffer[2*(Idx) + 3]))
 
 /**********************Slave Transmit and Receive Variables********************/
 PETIT_RXTX_STATE Petit_RxTx_State = PETIT_RXTX_RX;
-unsigned char PetitBuffer[PETITMODBUS_RXTX_BUFFER_SIZE];
-unsigned short Petit_CRC16 = 0xFFFF;
+pu8_t PetitBuffer[PETITMODBUS_RXTX_BUFFER_SIZE];
+pu16_t Petit_CRC16 = 0xFFFF;
 // of the two, PetitBufI is used more for RX validation and TX
 // PetitBufJ is used more for internal processing
-unsigned short PetitBufI = 0;
-unsigned short PetitBufJ = 0;
+pu16_t PetitBufI = 0;
+pu16_t PetitBufJ = 0;
 
-unsigned char *Petit_Ptr = &PetitBuffer[0];
+pu8_t *Petit_Ptr = &PetitBuffer[0];
 
-unsigned short Petit_Tx_Delay = 0;
+pu16_t Petit_Tx_Delay = 0;
 
-unsigned short PetitExpectedReceiveCount = 0;
+pu16_t PetitExpectedReceiveCount = 0;
 /*************************************************k****************************/
 
 void PetitRxBufferReset()
@@ -49,7 +48,7 @@ void PetitRxBufferReset()
 	return;
 }
 
-unsigned char PetitRxBufferInsert(unsigned char rcvd)
+pu8_t PetitRxBufferInsert(pu8_t rcvd)
 {
 	if (PetitBufI < PETITMODBUS_RXTX_BUFFER_SIZE
 			&& Petit_RxTx_State == PETIT_RXTX_RX)
@@ -62,7 +61,7 @@ unsigned char PetitRxBufferInsert(unsigned char rcvd)
 	return 1;
 }
 
-unsigned char PetitTxBufferPop(unsigned char* tx)
+pu8_t PetitTxBufferPop(pu8_t* tx)
 {
 	if (Petit_RxTx_State == PETIT_RXTX_TX)
 	{
@@ -90,18 +89,18 @@ unsigned char PetitTxBufferPop(unsigned char* tx)
  * @How to use          : initialize Petit_CRC16 to 0xFFFF beforehand
  */
 #if PETIT_CRC == PETIT_CRC_TABULAR
-void Petit_CRC16_Calc(const unsigned char Data)
+void Petit_CRC16_Calc(const pu16_t Data)
 {
 	Petit_CRC16 = (Petit_CRC16 >> 8) ^
 			PetitCRCtable[(Petit_CRC16 ^ (Data)) & 0xFF];
 	return;
 }
 #elif PETIT_CRC == PETIT_CRC_BITWISE
-void Petit_CRC16_Calc(const unsigned char Data)
+void Petit_CRC16_Calc(const pu16_t Data)
 {
-	unsigned char i;
+	pu8_t i;
 
-    Petit_CRC16 = Petit_CRC16 ^(unsigned int) Data;
+    Petit_CRC16 = Petit_CRC16 ^(pu16_t) Data;
     for (i = 8; i > 0; i--)
     {
         if (Petit_CRC16 & 0x0001)
@@ -120,7 +119,7 @@ void Petit_CRC16_Calc(const unsigned char Data)
  * @param[out]          : TRUE/FALSE
  * @How to use          : This function start to sending messages
  */
-unsigned char PetitSendMessage(void)
+pu8_t PetitSendMessage(void)
 {
 	PetitBufI = 0;
 	Petit_RxTx_State = PETIT_RXTX_TX_DATABUF;
@@ -134,7 +133,7 @@ unsigned char PetitSendMessage(void)
  * Function Name        : HandleModbusError
  * @How to use          : This function generated errors to Modbus Master
  */
-void HandlePetitModbusError(char ErrorCode)
+void HandlePetitModbusError(pu8_t ErrorCode)
 {
 	// Initialise the output buffer. The first byte in the buffer says how many registers we have read
 	PetitBuffer[PETIT_BUF_FN_CODE_I] |= 0x80;
@@ -155,9 +154,9 @@ void HandlePetitModbusReadHoldingRegisters(void)
 	// Holding registers are effectively numerical outputs that can be written to by the host.
 	// They can be control registers or analogue outputs.
 	// We potentially have one - the pwm output value
-	unsigned int Petit_StartAddress = 0;
-	unsigned int Petit_NumberOfRegisters = 0;
-	unsigned int Petit_i = 0;
+	pu16_t Petit_StartAddress = 0;
+	pu16_t Petit_NumberOfRegisters = 0;
+	pu16_t Petit_i = 0;
 
 	// The message contains the requested start address and number of registers
 	Petit_StartAddress = PETIT_BUF_DAT_M(0);
@@ -177,7 +176,7 @@ void HandlePetitModbusReadHoldingRegisters(void)
 
 		for (Petit_i = 0; Petit_i < Petit_NumberOfRegisters; Petit_i++)
 		{
-			unsigned short Petit_CurrentData;
+			pu16_t Petit_CurrentData;
 #if defined(PETIT_REG) && \
 	(PETIT_REG == PETIT_REG_INTERNAL || PETIT_REG == PETIT_REG_BOTH)
 			Petit_CurrentData = PetitRegisters[Petit_StartAddress
@@ -191,9 +190,9 @@ void HandlePetitModbusReadHoldingRegisters(void)
 			}
 #endif
 			PetitBuffer[PetitBufJ] =
-					(unsigned char) ((Petit_CurrentData & 0xFF00) >> 8);
+					(pu8_t) ((Petit_CurrentData & 0xFF00) >> 8);
 			PetitBuffer[PetitBufJ + 1] =
-					(unsigned char) (Petit_CurrentData & 0xFF);
+					(pu8_t) (Petit_CurrentData & 0xFF);
 			PetitBufJ += 2;
 		}
 		PetitBuffer[2] = PetitBufJ - 3;
@@ -210,9 +209,9 @@ void HandlePetitModbusReadHoldingRegisters(void)
 #if PETITMODBUS_READ_INPUT_REGISTERS_ENABLED > 0
 void HandlePetitModbusReadInputRegisters(void)
 {
-	unsigned int Petit_StartAddress = 0;
-	unsigned int Petit_NumberOfRegisters = 0;
-	unsigned int Petit_i = 0;
+	pu16_t Petit_StartAddress = 0;
+	pu16_t Petit_NumberOfRegisters = 0;
+	pu16_t Petit_i = 0;
 
 	// The message contains the requested start address and number of registers
 	Petit_StartAddress = PETIT_BUF_DAT_M(0);
@@ -232,14 +231,14 @@ void HandlePetitModbusReadInputRegisters(void)
 
 		for (Petit_i = 0; Petit_i < Petit_NumberOfRegisters; Petit_i++)
 		{
-			unsigned short Petit_CurrentData;
+			pu16_t Petit_CurrentData;
 #if defined(PETIT_INPUT_REG) && \
-	(PETIT_INPUT_REG == PETIT_INPUT_REG_INTERNAL ||\
-			PETIT_INPUT_REG == PETIT_INPUT_REG_BOTH)
+	(PETIT_INPUT_REG == PETIT_REG_INTERNAL ||\
+			PETIT_INPUT_REG == PETIT_REG_BOTH)
 			Petit_CurrentData = PetitInputRegisters[Petit_StartAddress
 					+ Petit_i];
 #endif
-#if defined(PETIT_INPUT_REG) && PETIT_INPUT_REG == PETIT_INPUT_REG_EXTERNAL
+#if defined(PETIT_INPUT_REG) && PETIT_INPUT_REG == PETIT_REG_EXTERNAL
 			if (!PetitPortInputRegRead(Petit_StartAddress + Petit_i, &Petit_CurrentData))
 			{
 				HandlePetitModbusError(PETIT_ERROR_CODE_04);
@@ -247,9 +246,9 @@ void HandlePetitModbusReadInputRegisters(void)
 			}
 #endif
 			PetitBuffer[PetitBufJ] =
-					(unsigned char) ((Petit_CurrentData & 0xFF00) >> 8);
+					(pu8_t) ((Petit_CurrentData & 0xFF00) >> 8);
 			PetitBuffer[PetitBufJ + 1] =
-					(unsigned char) (Petit_CurrentData & 0xFF);
+					(pu8_t) (Petit_CurrentData & 0xFF);
 			PetitBufJ += 2;
 		}
 		PetitBuffer[2] = PetitBufJ - 3;
@@ -269,9 +268,9 @@ void HandlePetitModbusReadInputRegisters(void)
 void HandlePetitModbusWriteSingleRegister(void)
 {
 	// Write single numerical output
-	unsigned int Petit_Address = 0;
-	unsigned int Petit_Value = 0;
-	unsigned char Petit_i = 0;
+	pu16_t Petit_Address = 0;
+	pu16_t Petit_Value = 0;
+	pu8_t Petit_i = 0;
 
 	// The message contains the requested start address and number of registers
 	Petit_Address = PETIT_BUF_DAT_M(0);
@@ -292,7 +291,6 @@ void HandlePetitModbusWriteSingleRegister(void)
 		if(!PetitPortRegWrite(Petit_Address, Petit_Value))
 		{
 			HandlePetitModbusError(PETIT_ERROR_CODE_04);
-			break;
 		}
 #endif
 		// Output data buffer is exact copy of input buffer
@@ -313,11 +311,11 @@ void HandlePetitModbusWriteSingleRegister(void)
 void HandleMPetitodbusWriteMultipleRegisters(void)
 {
 	// Write single numerical output
-	unsigned int Petit_StartAddress = 0;
-	unsigned char Petit_ByteCount = 0;
-	unsigned int Petit_NumberOfRegisters = 0;
-	unsigned char Petit_i = 0;
-	unsigned int Petit_Value = 0;
+	pu16_t Petit_StartAddress = 0;
+	pu8_t Petit_ByteCount = 0;
+	pu16_t Petit_NumberOfRegisters = 0;
+	pu8_t Petit_i = 0;
+	pu16_t Petit_Value = 0;
 
 	// The message contains the requested start address and number of registers
 	Petit_StartAddress = PETIT_BUF_DAT_M(0);
@@ -344,7 +342,7 @@ void HandleMPetitodbusWriteMultipleRegisters(void)
 			PetitRegisters[Petit_StartAddress + Petit_i] = Petit_Value;
 #endif
 #if defined(PETIT_REG) && PETIT_REG == PETIT_REG_EXTERNAL
-			PetitPortRegWrite(Petit_Address, Petit_Value);
+			PetitPortRegWrite(Petit_StartAddress + Petit_i, Petit_Value);
 #endif
 		}
 
@@ -364,7 +362,7 @@ void HandleMPetitodbusWriteMultipleRegisters(void)
  *                        If data is not ready, return          DATA_NOT_READY
  *                        If functions is wrong, return         FALSE_FUNCTION
  */
-unsigned char CheckPetitModbusBufferComplete(void)
+pu8_t CheckPetitModbusBufferComplete(void)
 {
 	if (PetitBufI > 0 && PetitBuffer[0] != PETITMODBUS_SLAVE_ADDRESS)
 	{
@@ -410,8 +408,8 @@ unsigned char CheckPetitModbusBufferComplete(void)
  */
 void Petit_RxRTU(void)
 {
-	unsigned char Petit_i;
-	unsigned char Petit_ReceiveBufferControl = 0;
+	pu8_t Petit_i;
+	pu8_t Petit_ReceiveBufferControl = 0;
 	Petit_ReceiveBufferControl = CheckPetitModbusBufferComplete();
 
 	if (Petit_ReceiveBufferControl == PETIT_DATA_READY)
@@ -429,8 +427,8 @@ void Petit_RxRTU(void)
 		}
 
 		PetitRxBufferReset();
-		if (((unsigned int) PetitBuffer[PetitBufJ]
-				+ ((unsigned int) PetitBuffer[PetitBufJ
+		if (((pu16_t) PetitBuffer[PetitBufJ]
+				+ ((pu16_t) PetitBuffer[PetitBufJ
 						+ 1] << 8)) == Petit_CRC16)
 		{
 			// Valid message!
