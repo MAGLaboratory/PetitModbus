@@ -481,6 +481,7 @@ void Petit_ResponseProcess(void)
 #endif
 #if PETITMODBUS_READ_INPUT_REGISTERS_ENABLED > 0
 	case PETITMODBUS_READ_INPUT_REGISTERS:
+		HandlePetitModbusReadInputRegisters();
 		break;
 #endif
 #if PETITMODBUSWRITE_SINGLE_REGISTER_ENABLED > 0
