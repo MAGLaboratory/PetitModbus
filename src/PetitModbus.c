@@ -19,8 +19,13 @@
 #define PETIT_ERROR_CODE_01                     (0x01)                            // Function code is not supported
 #define PETIT_ERROR_CODE_02                     (0x02)                            // Register address is not allowed or write-protected
 #define PETIT_ERROR_CODE_04						(0x04)
+
 #define PETIT_BUF_FN_CODE_I 					(1)
 #define PETIT_BUF_BYTE_CNT_I                    (6)
+/**
+ * This macro extracts the contents of the buffer at index as a 16-bit
+ * unsigned integer
+ */
 #define PETIT_BUF_DAT_M(Idx) (((pu16_t)(PetitBuffer[2*(Idx) + 2]) << 8) \
 			| (pu16_t) (PetitBuffer[2*(Idx) + 3]))
 
@@ -39,7 +44,14 @@ pu16_t Petit_Tx_Delay = 0;
 
 pu16_t PetitExpectedReceiveCount = 0;
 /*************************************************k****************************/
-
+/**
+ * Reset the modbus buffer.
+ *
+ * This function is called by the interrupt code that handles byte
+ * to byte time overrun.
+ * It is also called by the validation function to reject data that is not for
+ * this device before more system resources are taken.
+ */
 void PetitRxBufferReset()
 {
 	PetitBufI = 0;
@@ -48,7 +60,12 @@ void PetitRxBufferReset()
 	return;
 }
 
-pu8_t PetitRxBufferInsert(pu8_t rcvd)
+/**
+ * Inserts bits into the buffer on device receive.
+ * @param[in] rcvd the byte to insert into the buffer
+ * @return bytes "left" to insert into buffer (1 if byte insertion failed)
+ */
+pb_t PetitRxBufferInsert(pu8_t rcvd)
 {
 	if (PetitBufI < PETITMODBUS_RXTX_BUFFER_SIZE
 			&& Petit_RxTx_State == PETIT_RXTX_RX)
@@ -61,7 +78,13 @@ pu8_t PetitRxBufferInsert(pu8_t rcvd)
 	return 1;
 }
 
-pu8_t PetitTxBufferPop(pu8_t* tx)
+/**
+ * This function removes a byte from the buffer and places it on "tx" to be
+ * sent over rs485.
+ * @param[out] tx
+ * @return 1 if there is a byte to be sent, 0 otherwise if the buffer is empty
+ */
+pb_t PetitTxBufferPop(pu8_t* tx)
 {
 	if (Petit_RxTx_State == PETIT_RXTX_TX)
 	{
@@ -77,16 +100,19 @@ pu8_t PetitTxBufferPop(pu8_t* tx)
 			// the direction pin is handled by the porting code
 			Petit_RxTx_State = PETIT_RXTX_RX;
 			Petit_Ptr = &(PetitBuffer[0]);
+			// PetitBufI is already set at 0 at this point
 			return 0;
 		}
 	}
 	return 0;
 }
 
-/*
- * Function Name        : CRC16_Calc
- * @param[in]           : Data
- * @How to use          : initialize Petit_CRC16 to 0xFFFF beforehand
+/**
+ * @fn CRC16_Calc
+ * This function does the CRC16 calculation for modbus.  Specifically, modbus
+ * calls for CRC16 using the CRC-16-IBM polynomial.
+ * @param[in] Data
+ * @note initialize Petit_CRC16 to 0xFFFF beforehand
  */
 #if PETIT_CRC == PETIT_CRC_TABULAR
 void Petit_CRC16_Calc(const pu16_t Data)
@@ -114,24 +140,26 @@ void Petit_CRC16_Calc(const pu16_t Data)
 #else
 #error "No Valid CRC Algorithm!"
 #endif
-/*
- * Function Name        : SendMessage
- * @param[out]          : TRUE/FALSE
- * @How to use          : This function start to sending messages
+
+/**
+ * @fn PetitSendMessage
+ * This function starts to send messages.
+ * @return always returns true
  */
-pu8_t PetitSendMessage(void)
+pb_t PetitSendMessage(void)
 {
 	PetitBufI = 0;
 	Petit_RxTx_State = PETIT_RXTX_TX_DATABUF;
 
-	return TRUE;
+	return true;
 }
 
 /******************************************************************************/
 
-/*
- * Function Name        : HandleModbusError
- * @How to use          : This function generated errors to Modbus Master
+/**
+ * @fn HandlePetitModbusError
+ * This function transmits generated errors to Modbus Master.
+ * @param[in] ErrorCode contains the modbus error code to be sent back.
  */
 void HandlePetitModbusError(pu8_t ErrorCode)
 {
@@ -144,9 +172,9 @@ void HandlePetitModbusError(pu8_t ErrorCode)
 
 /******************************************************************************/
 
-/*
- * Function Name        : HandleModbusReadHoldingRegisters
- * @How to use          : Modbus function 03 - Read holding registers
+/**
+ * @fn HandlePetitModbusReadHoldingRegisters
+ * Modbus function 03 - Read holding registers
  */
 #if PETITMODBUS_READ_HOLDING_REGISTERS_ENABLED > 0
 void HandlePetitModbusReadHoldingRegisters(void)
@@ -186,7 +214,7 @@ void HandlePetitModbusReadHoldingRegisters(void)
 			if (!PetitPortRegRead(Petit_StartAddress + Petit_i, &Petit_CurrentData))
 			{
 				HandlePetitModbusError(PETIT_ERROR_CODE_04);
-				break;
+				return;
 			}
 #endif
 			PetitBuffer[PetitBufJ] =
@@ -202,9 +230,12 @@ void HandlePetitModbusReadHoldingRegisters(void)
 }
 #endif
 
-/*
- * Function Name        : HandleModbusReadInputRegisters
- * @How to use          : Modbus function 04 - Read holding registers
+/**
+ * @fn HandlePetitModbusReadInputRegisters
+ * Modbus function 04 - Read input registers
+ *
+ * The registers read here are input registers only, so they can not be written
+ * to using another function code.
  */
 #if PETITMODBUS_READ_INPUT_REGISTERS_ENABLED > 0
 void HandlePetitModbusReadInputRegisters(void)
@@ -242,7 +273,7 @@ void HandlePetitModbusReadInputRegisters(void)
 			if (!PetitPortInputRegRead(Petit_StartAddress + Petit_i, &Petit_CurrentData))
 			{
 				HandlePetitModbusError(PETIT_ERROR_CODE_04);
-				break;
+				return;
 			}
 #endif
 			PetitBuffer[PetitBufJ] =
@@ -260,9 +291,9 @@ void HandlePetitModbusReadInputRegisters(void)
 
 /******************************************************************************/
 
-/*
- * Function Name        : HandleModbusReadInputRegisters
- * @How to use          : Modbus function 06 - Write single register
+/**
+ * @fn HandlePetitModbusReadInputRegisters
+ * Modbus function 06 - Write single register
  */
 #if PETITMODBUSWRITE_SINGLE_REGISTER_ENABLED > 0
 void HandlePetitModbusWriteSingleRegister(void)
@@ -283,6 +314,7 @@ void HandlePetitModbusWriteSingleRegister(void)
 		HandlePetitModbusError(PETIT_ERROR_CODE_02);
 	else
 	{
+		PetitRegChange = 1;
 #if defined(PETIT_REG) && \
 		(PETIT_REG == PETIT_REG_INTERNAL || PETIT_REG == PETIT_REG_BOTH)
 		PetitRegisters[Petit_Address] = Petit_Value;
@@ -291,10 +323,10 @@ void HandlePetitModbusWriteSingleRegister(void)
 		if(!PetitPortRegWrite(Petit_Address, Petit_Value))
 		{
 			HandlePetitModbusError(PETIT_ERROR_CODE_04);
+			return;
 		}
 #endif
 		// Output data buffer is exact copy of input buffer
-		PetitRegChange = 1;
 	}
 
 	PetitSendMessage();
@@ -303,8 +335,8 @@ void HandlePetitModbusWriteSingleRegister(void)
 
 /******************************************************************************/
 
-/*
- * Function Name        : HandleModbusWriteMultipleRegisters
+/**
+ * @fn HandlePetitModbusWriteMultipleRegisters
  * @How to use          : Modbus function 16 - Write multiple registers
  */
 #if PETITMODBUS_WRITE_MULTIPLE_REGISTERS_ENABLED > 0
@@ -330,6 +362,7 @@ void HandleMPetitodbusWriteMultipleRegisters(void)
 	{
 		// Initialise the output buffer. The first byte in the buffer says how many outputs we have set
 		PetitBufJ = 6;
+		PetitRegChange = 1;
 
 		// Output data buffer is exact copy of input buffer
 		for (Petit_i = 0; Petit_i < Petit_NumberOfRegisters; Petit_i++)
@@ -342,12 +375,13 @@ void HandleMPetitodbusWriteMultipleRegisters(void)
 			PetitRegisters[Petit_StartAddress + Petit_i] = Petit_Value;
 #endif
 #if defined(PETIT_REG) && PETIT_REG == PETIT_REG_EXTERNAL
-			PetitPortRegWrite(Petit_StartAddress + Petit_i, Petit_Value);
+			if (!PetitPortRegWrite(Petit_StartAddress + Petit_i, Petit_Value))
+			{
+				HandlePetitModbusError(PETIT_ERROR_CODE_04);
+				return;
+			}
 #endif
 		}
-
-		PetitRegChange = 1;
-
 		PetitSendMessage();
 	}
 }
@@ -355,12 +389,12 @@ void HandleMPetitodbusWriteMultipleRegisters(void)
 
 /******************************************************************************/
 
-/*
- * Function Name        : CheckBufferComplete
- * @return              : If data is ready, return              DATA_READY
- *                        If slave address is wrong, return     FALSE_SLAVE_ADDRESS
- *                        If data is not ready, return          DATA_NOT_READY
- *                        If functions is wrong, return         FALSE_FUNCTION
+/**
+ * @fn CheckPetitModbusBufferComplete
+ * @return 	DATA_READY 			If data is ready
+ * 			FALSE_SLAVE_ADDRESS	If slave address is wrong
+ *			DATA_NOT_READY		If data is not ready
+ *			FALSE_FUNCTION		If functions is wrong
  */
 pu8_t CheckPetitModbusBufferComplete(void)
 {
@@ -402,9 +436,9 @@ pu8_t CheckPetitModbusBufferComplete(void)
 
 /******************************************************************************/
 
-/*
- * Function Name        : RxRTU
- * @How to use          : Check for data ready, if it is good return answer
+/**
+ * @fn Petit_RxRTU
+ * Check for data ready, if it is good return answer
  */
 void Petit_RxRTU(void)
 {
@@ -443,9 +477,9 @@ void Petit_RxRTU(void)
 
 /******************************************************************************/
 
-/*
- * Function Name        : TxRTU
- * @How to use          : If it is ready send answers!
+/**
+ * @fn Petit_TxRTU
+ * If data is ready send answers!
  */
 void Petit_TxRTU(void)
 {
@@ -465,9 +499,11 @@ void Petit_TxRTU(void)
 	Petit_RxTx_State = PETIT_RXTX_TX_DLY;
 }
 
-/*
- * Function Name        : Petit_RxProcess
- * @How to use          : Only use this function if rx is clear for processing
+/**
+ * @fn Petit_ResponseProcess
+ * This function processes the modbus response once it has been determined that
+ * the message is for this node and the length is correct.
+ * @note Only use this function if rx is clear for processing
  */
 void Petit_ResponseProcess(void)
 {
@@ -503,9 +539,9 @@ void Petit_ResponseProcess(void)
 
 /******************************************************************************/
 
-/*
- * Function Name        : ProcessModbus
- * @How to use          : ModBus main core! Call this function into main!
+/**
+ * @fn ProcessPetitModbus
+ * ModBus main core! Call this function into main!
  */
 void ProcessPetitModbus(void)
 {
