@@ -1,3 +1,10 @@
+/******************************************************************************
+ * @file PetitReg.c
+ *
+ * This file contains the definitions for register files in Petit Modbus.
+ * These constants are controlled by flags which configure the library for
+ * internal or external register file use.
+ *****************************************************************************/
 #include "PetitModbus.h"
 #include "PetitModbusPort.h"
 

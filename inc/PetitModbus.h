@@ -1,9 +1,9 @@
-/*  PetitModbus Version 1.0
- *  Author  :   Firat DEVECI
- *  Date    :   27.07.16
- *  
- *  Tips    :   If you want to use RS485 you have to use RX-Pull-Up Resistor!
- */
+
+/******************************************************************************
+ * @file PetitModbus.h
+ *
+ * This header file is for the core of petitmodbus.
+ *****************************************************************************/
 
 #ifndef __PETITMODBUS__H
 #define __PETITMODBUS__H

@@ -1,3 +1,11 @@
+/******************************************************************************
+ * @file PetitCRCtable.c
+ *
+ * This file contains the CRC table used to calculate the CRC for modbus.
+ * This CRC table is only included if the CRC calculation mode is set to 
+ * PETIT_CRC_TABULAR.
+ *****************************************************************************/
+
 #include "PetitModbusPort.h"
 
 #if PETIT_CRC == PETIT_CRC_TABULAR

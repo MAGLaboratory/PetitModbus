@@ -1,3 +1,9 @@
+/******************************************************************************
+ * @file PetitModbus.c
+ *
+ * This file contains the core of PetitModbus.
+ *****************************************************************************/
+
 #include "PetitModbus.h"
 
 /*******************************ModBus Functions*******************************/
@@ -101,6 +107,7 @@ pb_t PetitTxBufferPop(pu8_t* tx)
 			Petit_RxTx_State = PETIT_RXTX_RX;
 			Petit_Ptr = &(PetitBuffer[0]);
 			// PetitBufI is already set at 0 at this point
+			PetitLedOff();
 			return 0;
 		}
 	}
@@ -167,6 +174,7 @@ void HandlePetitModbusError(pu8_t ErrorCode)
 	PetitBuffer[PETIT_BUF_FN_CODE_I] |= 0x80;
 	PetitBuffer[2] = ErrorCode;
 	PetitBufJ = 3;
+	PetitLedErrFail();
 	PetitSendMessage();
 }
 
@@ -224,7 +232,7 @@ void HandlePetitModbusReadHoldingRegisters(void)
 			PetitBufJ += 2;
 		}
 		PetitBuffer[2] = PetitBufJ - 3;
-
+		PetitLedSuc();
 		PetitSendMessage();
 	}
 }
@@ -283,7 +291,7 @@ void HandlePetitModbusReadInputRegisters(void)
 			PetitBufJ += 2;
 		}
 		PetitBuffer[2] = PetitBufJ - 3;
-
+		PetitLedSuc();
 		PetitSendMessage();
 	}
 }
@@ -328,7 +336,7 @@ void HandlePetitModbusWriteSingleRegister(void)
 #endif
 		// Output data buffer is exact copy of input buffer
 	}
-
+	PetitLedSuc();
 	PetitSendMessage();
 }
 #endif
@@ -382,6 +390,7 @@ void HandleMPetitodbusWriteMultipleRegisters(void)
 			}
 #endif
 		}
+		PetitLedSuc();
 		PetitSendMessage();
 	}
 }
@@ -470,6 +479,7 @@ void Petit_RxRTU(void)
 		}
 		else
 		{
+			PetitLedCrcFail();
 			Petit_RxTx_State = PETIT_RXTX_RX;
 		}
 	}

@@ -1,18 +1,22 @@
-//==============================================================================
-// PetitModbusPort.h
-// This is a file to support porting PetitModbus
-//==============================================================================
+/******************************************************************************
+ * @file PetitModbusPort.h
+ * This is a file to support porting PetitModbus.
+*******************************************************************************/
 #ifndef __PETIT_MODBUS_PORT_H__
 #define __PETIT_MODBUS_PORT_H__
 
 /**************************Petit Modbus Contents*******************************/
-#define PETIT_CRC_TABULAR  (0x4040)
-#define PETIT_CRC_BITWISE  (0x2020)
-#define PETIT_CRC_EXTERNAL (0x9090)
+#define PETIT_CRC_TABULAR   (0x4040)
+#define PETIT_CRC_BITWISE   (0x2020)
+#define PETIT_CRC_EXTERNAL  (0x9090)
 
-#define PETIT_REG_INTERNAL (0x1333)
-#define PETIT_REG_BOTH     (0x1222)
-#define PETIT_REG_EXTERNAL (0x2222)
+#define PETIT_REG_INTERNAL  (0x1333)
+#define PETIT_REG_BOTH      (0x1222)
+#define PETIT_REG_EXTERNAL  (0x2222)
+
+#define PETIT_USER_LED_NONE (0x7777)
+#define PETIT_USER_LED_FN   (0x5555)
+#define PETIT_USER_LED_DEF  (0x3333)
 
 // file with user-defined constants
 #include "PetitModbusUserPort.h"
@@ -55,5 +59,16 @@ extern pb_t PetitPortRegWrite(pu8_t Addr, pu16_t Data);
 	(PETIT_INPUT_REG == PETIT_REG_EXTERNAL || \
 			PETIT_INPUT_REG == PETIT_REG_BOTH)
 extern pb_t PetitPortInputRegRead(pu8_t Addr, pu16_t* Data);
+#endif
+#if !defined(PETIT_USER_LED) || PETIT_USER_LED == PETIT_USER_LED_NONE
+#define PetitLedSuc()
+#define PetitLedErrFail()
+#define PetitLedCrcFail()
+#define PetitLedOff()
+#elif defined(PETIT_USER_LED) && PETIT_USER_LED == PETIT_USER_LED_FN
+extern void PetitLedSuc(void);
+extern void PetitLedErrFail(void);
+extern void PetitLedCrcFail(void);
+extern void PetitLedOff(void);
 #endif
 #endif /* __PETIT_MODBUS_PORT_H__ */
