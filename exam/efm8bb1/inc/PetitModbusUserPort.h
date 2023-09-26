@@ -9,6 +9,7 @@
 #define INC_PETITMODBUSUSERPORT_H_
 #include <stdint.h>
 #include <stdbool.h>
+#include <SI_EFM8BB1_Register_Enums.h>                  // SFR declarations
 // Petit Modbus RTU Slave Output Register Number
 // Have to put a number of registers here
 // It has to be bigger than 0 (zero)!!
@@ -25,9 +26,17 @@
 // 1 for processing in the same cycle as TX CRC calculation
 #define PETITMODBUS_PROCESS_POSITION                    ( 0 )
 // Cycles to delay TX once the CRC finishes calculation
+// this can either be a define as stated here or an integer changed by the
+// application code
 // #define PETITMODBUS_DLY_TOP (0)
 // Address of this device
+// this can either be a define as stated here or an integer changed by the
+// application code
 // #define PETITMODBUS_SLAVE_ADDRESS (1)
+// Allow LED functions to be specified by the user
+// 0 to leave blank functions
+// 1 to allow user-defined functions
+#define PETIT_USER_LED PETIT_USER_LED_DEF
 
 // how to process the CRC
 // PETIT_CRC_TABULAR takes up code space but is the fastest.
@@ -56,5 +65,10 @@
 extern uint8_t PETITMODBUS_DLY_TOP;
 // Address of this device
 extern uint8_t PETITMODBUS_SLAVE_ADDRESS;
-
+// Defines for LEDs
+#define nLED (P1_B4)
+#define PetitLedSuc() nLED = 0;
+#define PetitLedErrFail()
+#define PetitLedCrcFail()
+#define PetitLedOff() nLED = 1;
 #endif /* INC_PETITMODBUSUSERPORT_H_ */

@@ -79,6 +79,9 @@ void PetitPortTxBegin(pu8_t tx)
 
 /**
  * writes to the registers
+ *
+ * this function will return if it is determined that the value written is
+ * invalid.
  * @return the number of registers written
  *   0 if an error occurred during processing
  *   1 if everything went smoothly
@@ -90,34 +93,47 @@ pb_t PetitPortRegWrite(pu8_t Address, pu16_t Data)
 	{
 		return 0;
 	}
+	// the status register only accepts a few values, and petting the watchdog
+	// automatically enables the watchdog
+	// the reset source can be reset to 0 by writing 0 to this register
 	if (Address == eMMW_HR_STA)
 	{
-		if (Data == C_WDT_PET)
+		switch (Data)
 		{
+		case 0:
+			sv_dev_sta.v.lastRstS = eLR_Init;
+			break;
+		case C_WDT_PET:
 			mbWDTpet = true;
 			mbWDTen = true;
-		}
-		else if (Data == C_WDT_DIS)
-		{
+			break;
+		case C_WDT_DIS:
 			mbWDTen = false;
-		}
-		else
-		{
+			break;
+		default:
 			return 0;
 		}
 	}
+	// you can enter whatever password you want
 	if (Address == eMMW_HR_CFG)
 	{
 		pw = Data;
 		pw_flag = true;
 	}
+	// it's perfectly valid to enter 0 for this since none of the bytewise
+	// changes will be applied
 	if (Address == eMMW_HR_MB)
 	{
 		if ((Data & 0xFF) > 0)
 		{
+			// but if you enter an SID that is too large, you will get an error
 			if ((Data & 0xFF) < 248)
 			{
 				cfg.sid = Data & 0xFF;
+			}
+			else
+			{
+				return 0;
 			}
 		}
 		if (Data >> 8 > 0)
@@ -128,18 +144,28 @@ pb_t PetitPortRegWrite(pu8_t Address, pu16_t Data)
 			}
 		}
 	}
+	// the WDT timeout must be at least one minute.
 	if (Address == eMMW_HR_WDT)
 	{
 		if (Data > 0)
 		{
 			cfg.wdto = Data;
 		}
+		else
+		{
+			return 0;
+		}
 	}
+	// the new password must be valid
 	if (Address == eMMW_HR_PW)
 	{
 		if (Data != 0 && Data != C_CMD_COMMIT && Data != C_CMD_CANCEL)
 		{
 			cfg.pw = Data;
+		}
+		else
+		{
+			return 0;
 		}
 	}
 
