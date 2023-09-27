@@ -5,7 +5,9 @@
  ******************************************************************************/
 
 /**
- * @defgroup Petit_Modbus_Support Petit Modbus Support
+ * @defgroup IoT_SV_EFM8BB1LCK_Petit_Modbus_Port IoT Supervisor EFM8BB1LCK Petit Modbus Port
+ * This section contains the functions necessary to make Petit Modbus work with
+ * this board and MCU.
  * @{
  */
 
@@ -17,11 +19,6 @@
 #include "ModbusMiddleWare.h"
 
 
-/**
- * @defgroup Petit_Modbus_Porting_Functions Petit Modbus Porting Functions
- * @brief These functions allow Petit Modbus to work with our hardware
- * @{
- */
 /**
  *  starts the inter-byte timer.  if the timer fires, the rx buffer is invalid
  */
@@ -50,7 +47,7 @@ void PetitPortTimerStop()
  */
 void PetitPortDirTx()
 {
-	P0_B3 = true;
+	XCVR_TX = true;
 	dir_tx = true;
 	return;
 }
@@ -60,7 +57,7 @@ void PetitPortDirTx()
  */
 void PetitPortDirRx()
 {
-	P0_B3 = false;
+	XCVR_TX = false;
 	dir_tx = false;
 	return;
 }
@@ -224,12 +221,7 @@ pu8_t PetitPortInputRegRead(pu8_t Address, pu16_t* Data)
 }
 */
 
-// group Petit Modbus Porting Functions
-/**
- * @}
- */
-
-// group Petit Modbus Support
+// group IoT Supervisor EFM8BB1LCK Petit Modbus Port
 /**
  * @}
  */

@@ -5,15 +5,22 @@
  *******************************************************************************
  */
 
+/**
+ * @addtogroup IoT_SV_EFM8BB1LCK_Petit_Modbus_Port
+ * @{
+ */
+
 #ifndef INC_PETITMODBUSUSERPORT_H_
 #define INC_PETITMODBUSUSERPORT_H_
 #include <stdint.h>
 #include <stdbool.h>
 #include <SI_EFM8BB1_Register_Enums.h>                  // SFR declarations
+#include "IoT_Supervisor.h"
+#include "ModbusMiddleWare.h"
 // Petit Modbus RTU Slave Output Register Number
 // Have to put a number of registers here
 // It has to be bigger than 0 (zero)!!
-#define NUMBER_OF_PETITREGISTERS                 		( 5 )
+#define NUMBER_OF_PETITREGISTERS                 		( eMMW_HR_NUM )
 #define NUMBER_OF_INPUT_PETITREGISTERS 					( 1 )
 #define NUMBER_OF_REGISTERS_IN_BUFFER                   ( 3 )
 
@@ -66,9 +73,11 @@ extern uint8_t PETITMODBUS_DLY_TOP;
 // Address of this device
 extern uint8_t PETITMODBUS_SLAVE_ADDRESS;
 // Defines for LEDs
-#define nLED (P1_B4)
 #define PetitLedSuc() nLED = 0;
 #define PetitLedErrFail()
 #define PetitLedCrcFail()
 #define PetitLedOff() nLED = 1;
 #endif /* INC_PETITMODBUSUSERPORT_H_ */
+
+// addtogroup IoT_SV_EFM8BB1LCK_Petit_Modbus_Port
+/** @} */

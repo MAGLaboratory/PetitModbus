@@ -552,6 +552,7 @@ void Petit_ResponseProcess(void)
 /**
  * @fn ProcessPetitModbus
  * ModBus main core! Call this function into main!
+ * @mermaid{ProcessPetitModbus}
  */
 void ProcessPetitModbus(void)
 {
