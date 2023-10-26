@@ -10,9 +10,9 @@
 #define PETIT_CRC_BITWISE   (0x2020)
 #define PETIT_CRC_EXTERNAL  (0x9090)
 
-#define PETIT_REG_INTERNAL  (0x1333)
-#define PETIT_REG_BOTH      (0x1222)
-#define PETIT_REG_EXTERNAL  (0x2222)
+#define PETIT_INTERNAL  (0x1333)
+#define PETIT_BOTH      (0x1222)
+#define PETIT_EXTERNAL  (0x2222)
 
 #define PETIT_USER_LED_NONE (0x7777)
 #define PETIT_USER_LED_FN   (0x5555)
@@ -28,15 +28,19 @@ extern pb_t PetitTxBufferPop(pu8_t* tx);
 /******************************User Content************************************/
 
 // data defined for porting
+#if defined(PETIT_COIL) && \
+	(PETIT_COIL == PETIT_INTERNAL || PETIT_COIL == PETIT_BOTH)
+	pu8_t PetitCoil[NUMBER_OF_PETITCOILS];
+#endif
 #if defined(PETIT_REG) && \
-	(PETIT_REG == PETIT_REG_INTERNAL || PETIT_REG == PETIT_REG_BOTH)
+	(PETIT_REG == PETIT_INTERNAL || PETIT_REG == PETIT_BOTH)
 extern pu16_t PetitRegisters[NUMBER_OF_PETITREGISTERS];
 #endif
 extern pu8_t PetitRegChange;
 
 #if defined(PETIT_INPUT_REG) && \
-	(PETIT_INPUT_REG == PETIT_REG_INTERNAL ||\
-			PETIT_INPUT_REG == PETIT_REG_BOTH)
+	(PETIT_INPUT_REG == PETIT_INTERNAL ||\
+			PETIT_INPUT_REG == PETIT_BOTH)
 extern pu16_t PetitInputRegisters[NUMBER_OF_INPUT_PETITREGISTERS];
 #endif
 
@@ -50,14 +54,20 @@ extern void PetitPortDirRx(void);
 extern void PetitPortCRC16Calc(pu8_t Data, pu16_t* CRC);
 #endif
 
+#if defined(PETIT_COIL) && \
+	(PETIT_COIL == PETIT_EXTERNAL || PETIT_REG == PETIT_BOTH)
+extern pb_t PetitPortCoilRead(pu16_t Addr, pu8_t* Data);
+extern pb_t PetitPortCoilWrite(pu16_t Addr, pu16_t Data);
+#endif
+
 #if defined(PETIT_REG) && \
-	(PETIT_REG == PETIT_REG_EXTERNAL || PETIT_REG == PETIT_REG_BOTH)
+	(PETIT_REG == PETIT_EXTERNAL || PETIT_REG == PETIT_BOTH)
 extern pb_t PetitPortRegRead(pu8_t Addr, pu16_t* Data);
 extern pb_t PetitPortRegWrite(pu8_t Addr, pu16_t Data);
 #endif
 #if defined(PETIT_INPUT_REG) && \
-	(PETIT_INPUT_REG == PETIT_REG_EXTERNAL || \
-			PETIT_INPUT_REG == PETIT_REG_BOTH)
+	(PETIT_INPUT_REG == PETIT_EXTERNAL || \
+			PETIT_INPUT_REG == PETIT_BOTH)
 extern pb_t PetitPortInputRegRead(pu8_t Addr, pu16_t* Data);
 #endif
 #if !defined(PETIT_USER_LED) || PETIT_USER_LED == PETIT_USER_LED_NONE
