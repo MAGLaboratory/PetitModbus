@@ -30,7 +30,7 @@ extern pb_t PetitTxBufferPop(pu8_t* tx);
 // data defined for porting
 #if defined(PETIT_COIL) && \
 	(PETIT_COIL == PETIT_INTERNAL || PETIT_COIL == PETIT_BOTH)
-	pu8_t PetitCoil[NUMBER_OF_PETITCOILS];
+	pu8_t PetitCoils[NUMBER_OF_PETITCOILS];
 #endif
 #if defined(PETIT_REG) && \
 	(PETIT_REG == PETIT_INTERNAL || PETIT_REG == PETIT_BOTH)
