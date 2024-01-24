@@ -1,11 +1,11 @@
 var _petit_modbus_port_8h =
 [
+    [ "PETIT_BOTH", "_petit_modbus_port_8h.html#a84de0ebc345dc21457409022b68c42e3", null ],
     [ "PETIT_CRC_BITWISE", "_petit_modbus_port_8h.html#ab97fba56915b71633a861e3a0d14772b", null ],
     [ "PETIT_CRC_EXTERNAL", "_petit_modbus_port_8h.html#a07fc8e8819b801ba517d99a82974334e", null ],
     [ "PETIT_CRC_TABULAR", "_petit_modbus_port_8h.html#af89bf53bd796ef0948cf8ef1c9e6e480", null ],
-    [ "PETIT_REG_BOTH", "_petit_modbus_port_8h.html#a3eb305f5f7f8a8d96cd528ec9bb72bd0", null ],
-    [ "PETIT_REG_EXTERNAL", "_petit_modbus_port_8h.html#a8e04421b0cf3ca305d020bcf03881097", null ],
-    [ "PETIT_REG_INTERNAL", "_petit_modbus_port_8h.html#ae0647f4e3383d710744ecc345062e67f", null ],
+    [ "PETIT_EXTERNAL", "_petit_modbus_port_8h.html#a83c49c38462ef41bc9594987190d6371", null ],
+    [ "PETIT_INTERNAL", "_petit_modbus_port_8h.html#a6805d712ec38f2a06043227543c7a14f", null ],
     [ "PETIT_USER_LED_DEF", "_petit_modbus_port_8h.html#ad99bff6df568870f4d5f50597b272091", null ],
     [ "PETIT_USER_LED_FN", "_petit_modbus_port_8h.html#a583ad7183f137aa66b60687baf614573", null ],
     [ "PETIT_USER_LED_NONE", "_petit_modbus_port_8h.html#a47d4f6a58b70ef1dff9560b5dcf487ba", null ],

@@ -7,6 +7,7 @@ var _petit_modbus_8c =
     [ "PETIT_DATA_READY", "_petit_modbus_8c.html#a8e47186d423a1b375d37d9812c4a7dc5", null ],
     [ "PETIT_ERROR_CODE_01", "_petit_modbus_8c.html#a7c8a97cda1581d60210ce954bda2b474", null ],
     [ "PETIT_ERROR_CODE_02", "_petit_modbus_8c.html#a51603903f7f173e19518e786b2bcdce4", null ],
+    [ "PETIT_ERROR_CODE_03", "_petit_modbus_8c.html#a98ca337e4d37cbdec434685fc93c15ca", null ],
     [ "PETIT_ERROR_CODE_04", "_petit_modbus_8c.html#a8041141d07a48a5244d55ccd5ba4058c", null ],
     [ "PETIT_FALSE_FUNCTION", "_petit_modbus_8c.html#a25b1c794040044639ee48cbea4f254c3", null ],
     [ "PETIT_FALSE_SLAVE_ADDRESS", "_petit_modbus_8c.html#aeb993778d533275c9c20576efc8033ee", null ],

@@ -15,6 +15,7 @@
 #include "PetitModbusPort.h"
 // User Includes
 #include <SI_EFM8BB1_Register_Enums.h>
+#include "hardware.h"
 #include "IoT_Supervisor.h"
 #include "ModbusMiddleWare.h"
 
@@ -220,6 +221,47 @@ pu8_t PetitPortInputRegRead(pu8_t Address, pu16_t* Data)
 	return 1;
 }
 */
+
+/**
+ * @fn PetitCoilRead
+ * reads coils
+ * @param Data should be at least the logical value of the coil, not the byte
+ *   in which it resides
+ * @return: the number of coils read
+ *   0 if an error occurred during processing
+ *   1 if everything went smoothly
+ */
+pb_t PetitPortCoilRead(pu16_t Address, pu8_t* Data)
+{
+	if (Address == 0)
+	{
+		*Data = sys_ok;
+		return 1;
+	}
+	return 0;
+}
+
+/**
+ * @fn PetitPortCoilWrite(pu16_t Address, pu16_t Data)
+ * writes coils
+ * @param Data is a bit larger here to account for the fact that modbus will
+ *   use 0xFF00 to write "high" to the coil using single coil write
+ * @return: the number of coils written
+ *   0 if an error occurred during processing
+ *   1 if everything went smoothly
+ */
+pb_t PetitPortCoilWrite(pu16_t Address, pu16_t Data)
+{
+	if (Address == 0)
+	{
+		if (Data)
+			sys_ok = true;
+		else
+			sys_ok = false;
+		return 1;
+	}
+	return 0;
+}
 
 // group IoT Supervisor EFM8BB1LCK Petit Modbus Port
 /**
