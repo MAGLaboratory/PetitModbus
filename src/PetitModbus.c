@@ -184,7 +184,7 @@ void HandlePetitModbusError(pu8_t ErrorCode)
  * @fn HandlePetitModbusReadCoils
  * Modbus function 01 - Read Coils
  */
-#if PETITMODBUS_READ_COILS_ENABLED > 0
+#if PETITMODBUS_READ_COILS_ENABLED != 0
 void HandlePetitModbusReadCoils(void)
 {
 	pu16_t Petit_StartCoil = 0;
@@ -204,8 +204,8 @@ void HandlePetitModbusReadCoils(void)
 	// the number of registers in buffer are multiplied by two since each
 	// register in modbus is 16 bits
 	if ((Petit_StartCoil + Petit_NumberOfCoils)
-			> NUMBER_OF_COILS ||
-			Petit_NumberOfCoils + 7 >> 3 > NUMBER_OF_REGISTERS_IN_BUFFER * 2 ||
+			> NUMBER_OF_PETITCOILS ||
+			(Petit_NumberOfCoils + 7) >> 3 > NUMBER_OF_REGISTERS_IN_BUFFER * 2 ||
 			Petit_NumberOfCoils == 0)
 	{
 		HandlePetitModbusError(PETIT_ERROR_CODE_02);
@@ -231,8 +231,8 @@ void HandlePetitModbusReadCoils(void)
 	(PETIT_COIL == PETIT_INTERNAL || PETIT_COIL == PETIT_BOTH)
 			// test the current coil bit
 			Petit_CurrentBit =
-					(PetitCoils[Petit_StartCoil + Petit_i >> 3]
-					& 1 << (Petit_StartCoil + Petit_i & 7)) != 0;
+					(PetitCoils[(Petit_StartCoil + Petit_i) >> 3]
+					& 1 << ((Petit_StartCoil + Petit_i) & 7)) != 0;
 			Petit_CurrentData |= (pu8_t) Petit_CurrentBit << (Petit_i & 7);
 #endif
 #if defined(PETIT_COIL) && \
@@ -252,13 +252,13 @@ void HandlePetitModbusReadCoils(void)
 		PetitSendMessage();
 	}
 }
-#endif
+#endif /* PETITMODBUS_READ_COILS_ENABLED */
 
 /**
  * @fn HandlePetitModbusReadHoldingRegisters
  * Modbus function 03 - Read holding registers
  */
-#if PETITMODBUS_READ_HOLDING_REGISTERS_ENABLED > 0
+#if PETITMODBUS_READ_HOLDING_REGISTERS_ENABLED != 0
 void HandlePetitModbusReadHoldingRegisters(void)
 {
 	// Holding registers are effectively numerical outputs that can be written to by the host.
@@ -292,7 +292,8 @@ void HandlePetitModbusReadHoldingRegisters(void)
 			Petit_CurrentData = PetitRegisters[Petit_StartAddress
 					+ Petit_i];
 #endif
-#if defined(PETIT_REG) && PETIT_REG == PETIT_EXTERNAL
+#if defined(PETIT_REG) && \
+	(PETIT_REG == PETIT_EXTERNAL || PETIT_REG == PETIT_BOTH)
 			if (!PetitPortRegRead(Petit_StartAddress + Petit_i, &Petit_CurrentData))
 			{
 				HandlePetitModbusError(PETIT_ERROR_CODE_04);
@@ -310,7 +311,7 @@ void HandlePetitModbusReadHoldingRegisters(void)
 		PetitSendMessage();
 	}
 }
-#endif
+#endif /* PETITMODBUS_READ_HOLDING_REGISTERS_ENABLED */
 
 /**
  * @fn HandlePetitModbusReadInputRegisters
@@ -319,7 +320,7 @@ void HandlePetitModbusReadHoldingRegisters(void)
  * The registers read here are input registers only, so they can not be written
  * to using another function code.
  */
-#if PETITMODBUS_READ_INPUT_REGISTERS_ENABLED > 0
+#if PETITMODBUS_READ_INPUT_REGISTERS_ENABLED != 0
 void HandlePetitModbusReadInputRegisters(void)
 {
 	pu16_t Petit_StartAddress = 0;
@@ -346,12 +347,12 @@ void HandlePetitModbusReadInputRegisters(void)
 		{
 			pu16_t Petit_CurrentData;
 #if defined(PETIT_INPUT_REG) && \
-	(PETIT_INPUT_REG == PETIT_INTERNAL ||\
-			PETIT_INPUT_REG == PETIT_BOTH)
+	(PETIT_INPUT_REG == PETIT_INTERNAL || PETIT_INPUT_REG == PETIT_BOTH)
 			Petit_CurrentData = PetitInputRegisters[Petit_StartAddress
 					+ Petit_i];
 #endif
-#if defined(PETIT_INPUT_REG) && PETIT_INPUT_REG == PETIT_EXTERNAL
+#if defined(PETIT_INPUT_REG) && \
+	(PETIT_INPUT_REG == PETIT_EXTERNAL || PETIT_INPUT_REG == PETIT_BOTH)
 			if (!PetitPortInputRegRead(Petit_StartAddress + Petit_i, &Petit_CurrentData))
 			{
 				HandlePetitModbusError(PETIT_ERROR_CODE_04);
@@ -369,19 +370,18 @@ void HandlePetitModbusReadInputRegisters(void)
 		PetitSendMessage();
 	}
 }
-#endif
+#endif /* PETITMODBUS_READ_INPUT_REGISTERS_ENABLED */
 
 /**
  * @fn HandlePetitModbusWriteSingleCoil
  * Modbus function 06 - Write single register
  */
-#if PETITMODBUS_WRITE_SINGLE_COIL_ENABLED > 0
+#if PETITMODBUS_WRITE_SINGLE_COIL_ENABLED != 0
 void HandlePetitModbusWriteSingleCoil(void)
 {
 	// Write single numerical output
 	pu16_t Petit_Address = 0;
 	pu16_t Petit_Value = 0;
-	pu8_t Petit_i = 0;
 
 	// The message contains the requested start address and number of registers
 	Petit_Address = PETIT_BUF_DAT_M(0);
@@ -390,7 +390,7 @@ void HandlePetitModbusWriteSingleCoil(void)
 	// Initialise the output buffer. The first byte in the buffer says how many registers we have read
 	PetitBufJ = 6;
 
-	if (Petit_Address >= NUMBER_OF_COILS)
+	if (Petit_Address >= NUMBER_OF_PETITCOILS)
 		HandlePetitModbusError(PETIT_ERROR_CODE_02);
 	else if (Petit_Value != 0x0000 && Petit_Value != 0xFF00)
 		HandlePetitModbusError(PETIT_ERROR_CODE_03);
@@ -403,7 +403,8 @@ void HandlePetitModbusWriteSingleCoil(void)
 		else
 			PetitCoils[Petit_Address >> 3] &= ~(1 << (Petit_Address & 7u));
 #endif
-#if defined(PETIT_COIL) && PETIT_COIL == PETIT_EXTERNAL
+#if defined(PETIT_COIL) && \
+	(PETIT_COIL == PETIT_EXTERNAL || PETIT_COIL == PETIT_BOTH)
 		if(!PetitPortCoilWrite(Petit_Address, Petit_Value))
 		{
 			HandlePetitModbusError(PETIT_ERROR_CODE_04);
@@ -416,19 +417,18 @@ void HandlePetitModbusWriteSingleCoil(void)
 	PetitSendMessage();
 
 }
-#endif
+#endif /* PETITMODBUS_WRITE_SINGLE_COIL_ENABLED */
 
 /**
  * @fn HandlePetitModbusWriteSingleRegister
  * Modbus function 06 - Write single register
  */
-#if PETITMODBUS_WRITE_SINGLE_REGISTER_ENABLED > 0
+#if PETITMODBUS_WRITE_SINGLE_REGISTER_ENABLED != 0
 void HandlePetitModbusWriteSingleRegister(void)
 {
 	// Write single numerical output
 	pu16_t Petit_Address = 0;
 	pu16_t Petit_Value = 0;
-	pu8_t Petit_i = 0;
 
 	// The message contains the requested start address and number of registers
 	Petit_Address = PETIT_BUF_DAT_M(0);
@@ -443,10 +443,11 @@ void HandlePetitModbusWriteSingleRegister(void)
 	{
 		PetitRegChange = 1;
 #if defined(PETIT_REG) && \
-		(PETIT_REG == PETIT_INTERNAL || PETIT_REG == PETIT_BOTH)
+	(PETIT_REG == PETIT_INTERNAL || PETIT_REG == PETIT_BOTH)
 		PetitRegisters[Petit_Address] = Petit_Value;
 #endif
-#if defined(PETIT_REG) && PETIT_REG == PETIT_EXTERNAL
+#if defined(PETIT_REG) && \
+	(PETIT_REG == PETIT_EXTERNAL || PETIT_REG == PETIT_BOTH)
 		if(!PetitPortRegWrite(Petit_Address, Petit_Value))
 		{
 			HandlePetitModbusError(PETIT_ERROR_CODE_04);
@@ -458,16 +459,15 @@ void HandlePetitModbusWriteSingleRegister(void)
 	PetitLedSuc();
 	PetitSendMessage();
 }
-#endif
+#endif /* PETITMODBUS_WRITE_SINGLE_REGISTER_ENABLED */
 
 /******************************************************************************/
 /**
  * @fn HandlePetitModbusWriteMultipleCoils
  * Modbus function 15 - Write multiple coils
  */
-#if PETITMODBUS_WRITE_MULTIPLE_COILS_ENABLED > 0
-void HandlePetitModbusWriteMultipleCoils(void)
-{
+#if PETITMODBUS_WRITE_MULTIPLE_COILS_ENABLED != 0
+void HandlePetitModbusWriteMultipleCoils(void){
 	// Write single numerical output
 	pu16_t Petit_StartCoil = 0;
 	pu8_t Petit_ByteCount = 0;
@@ -482,7 +482,7 @@ void HandlePetitModbusWriteMultipleCoils(void)
 
 	// If it is bigger than RegisterNumber return error to Modbus Master
 	if ((Petit_StartCoil + Petit_NumberOfCoils)
-			> NUMBER_OF_COILS)
+			> NUMBER_OF_PETITCOILS)
 		HandlePetitModbusError(PETIT_ERROR_CODE_02);
 	else if (Petit_NumberOfCoils > (255 - 9) * 8 || Petit_NumberOfCoils == 0)
 		HandlePetitModbusError(PETIT_ERROR_CODE_03);
@@ -498,16 +498,17 @@ void HandlePetitModbusWriteMultipleCoils(void)
 			Petit_CurrentBit = (PetitBuffer[(Petit_i >> 3) + 7]
 					& 1 << (Petit_i & 7))
 							!= 0;
-#if defined(PETIT_REG) && \
-		(PETIT_REG == PETIT_INTERNAL || PETIT_REG == PETIT_BOTH)
+#if defined(PETIT_COIL) && \
+		(PETIT_COIL == PETIT_INTERNAL || PETIT_COIL == PETIT_BOTH)
 			if (Petit_CurrentBit)
-				PetitCoils[Petit_StartCoil + Petit_i >> 3] |=
-						1 << (Petit_StartCoil + Petit_i & 7);
+				PetitCoils[(Petit_StartCoil + Petit_i) >> 3] |=
+						1 << ((Petit_StartCoil + Petit_i) & 7);
 			else
-				PetitCoils[Petit_StartCoil + Petit_i >> 3] &=
-						~(1 << (Petit_StartCoil + Petit_i & 7));
+				PetitCoils[(Petit_StartCoil + Petit_i) >> 3] &=
+						~(1 << ((Petit_StartCoil + Petit_i) & 7));
 #endif
-#if defined(PETIT_REG) && PETIT_REG == PETIT_EXTERNAL
+#if defined(PETIT_COIL) && \
+		( PETIT_COIL == PETIT_EXTERNAL || PETIT_COIL == PETIT_BOTH)
 			if (!PetitPortCoilWrite(Petit_StartCoil + Petit_i, Petit_CurrentBit))
 			{
 				HandlePetitModbusError(PETIT_ERROR_CODE_04);
@@ -519,13 +520,13 @@ void HandlePetitModbusWriteMultipleCoils(void)
 		PetitSendMessage();
 	}
 }
-#endif
+#endif /* PETITMODBUS_WRITE_MULTIPLE_COILS_ENABLED */
 
 /**
  * @fn HandlePetitModbusWriteMultipleRegisters
  * Modbus function 16 - Write multiple registers
  */
-#if PETITMODBUS_WRITE_MULTIPLE_REGISTERS_ENABLED > 0
+#if PETITMODBUS_WRITE_MULTIPLE_REGISTERS_ENABLED != 0
 void HandlePetitModbusWriteMultipleRegisters(void)
 {
 	// Write single numerical output
@@ -560,7 +561,8 @@ void HandlePetitModbusWriteMultipleRegisters(void)
 		(PETIT_REG == PETIT_INTERNAL || PETIT_REG == PETIT_BOTH)
 			PetitRegisters[Petit_StartAddress + Petit_i] = Petit_Value;
 #endif
-#if defined(PETIT_REG) && PETIT_REG == PETIT_EXTERNAL
+#if defined(PETIT_REG) && \
+		( PETIT_REG == PETIT_EXTERNAL || PETIT_REG == PETIT_BOTH)
 			if (!PetitPortRegWrite(Petit_StartAddress + Petit_i, Petit_Value))
 			{
 				HandlePetitModbusError(PETIT_ERROR_CODE_04);
@@ -572,7 +574,7 @@ void HandlePetitModbusWriteMultipleRegisters(void)
 		PetitSendMessage();
 	}
 }
-#endif
+#endif /* PETITMODBUS_WRITE_MULTIPLE_REGISTERS_ENABLED */
 
 /******************************************************************************/
 

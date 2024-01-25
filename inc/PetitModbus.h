@@ -19,7 +19,7 @@
 #define PETITMODBUS_RXTX_BUFFER_SIZE  (2*(NUMBER_OF_REGISTERS_IN_BUFFER) + 9)
 
 #if PETIT_CRC == PETIT_CRC_TABULAR
-extern PETIT_CODE const short PetitCRCtable[];
+extern PETIT_CODE const pu16_t PetitCRCtable[] PETIT_FLASH_ATTR;
 #endif
 
 typedef enum
