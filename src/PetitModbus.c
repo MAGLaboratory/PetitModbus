@@ -67,6 +67,53 @@ void PetitRxBufferReset()
 	return;
 }
 
+/******************************************************************************/
+
+/**
+ * @fn CheckPetitModbusBufferComplete
+ * @return 	DATA_READY 			If data is ready
+ * 			FALSE_SLAVE_ADDRESS	If slave address is wrong
+ *			DATA_NOT_READY		If data is not ready
+ *			FALSE_FUNCTION		If functions is wrong
+ */
+pu8_t CheckPetitModbusBufferComplete(void)
+{
+	if (PetitBufI > 0 && PetitBuffer[0] != PETITMODBUS_SLAVE_ADDRESS)
+	{
+		return PETIT_FALSE_SLAVE_ADDRESS;
+	}
+
+	if (PetitBufI > 6 && PetitExpectedReceiveCount == 0)
+	{
+		if (PetitBuffer[PETIT_BUF_FN_CODE_I] >= 0x01
+				&& PetitBuffer[PETIT_BUF_FN_CODE_I] <= 0x06)  // RHR
+		{
+			PetitExpectedReceiveCount = 8;
+		}
+		else if (PetitBuffer[PETIT_BUF_FN_CODE_I] == 0x0F
+				|| PetitBuffer[PETIT_BUF_FN_CODE_I] == 0x10)
+		{
+			PetitExpectedReceiveCount = PetitBuffer[PETIT_BUF_BYTE_CNT_I] + 9;
+			if (PetitExpectedReceiveCount > PETITMODBUS_RXTX_BUFFER_SIZE)
+			{
+				return PETIT_FALSE_FUNCTION;
+			}
+		}
+		else
+		{
+			return PETIT_FALSE_FUNCTION;
+		}
+	}
+
+	if (PetitExpectedReceiveCount
+			&& PetitBufI >= PetitExpectedReceiveCount)
+	{
+		return PETIT_DATA_READY;
+	}
+
+	return PETIT_DATA_NOT_READY;
+}
+
 /**
  * Inserts bits into the buffer on device receive.
  * @param[in] rcvd the byte to insert into the buffer
@@ -80,6 +127,10 @@ pb_t PetitRxBufferInsert(pu8_t rcvd)
 		*Petit_Ptr++ = rcvd;
 		PetitBufI++;
 		PetitPortTimerStart();
+		if (CheckPetitModbusBufferComplete() == PETIT_DATA_READY)
+		{
+			PetitPortTimerStop();
+		}
 		return 0;
 	}
 	return 1;
@@ -575,53 +626,6 @@ void HandlePetitModbusWriteMultipleRegisters(void)
 	}
 }
 #endif /* PETITMODBUS_WRITE_MULTIPLE_REGISTERS_ENABLED */
-
-/******************************************************************************/
-
-/**
- * @fn CheckPetitModbusBufferComplete
- * @return 	DATA_READY 			If data is ready
- * 			FALSE_SLAVE_ADDRESS	If slave address is wrong
- *			DATA_NOT_READY		If data is not ready
- *			FALSE_FUNCTION		If functions is wrong
- */
-pu8_t CheckPetitModbusBufferComplete(void)
-{
-	if (PetitBufI > 0 && PetitBuffer[0] != PETITMODBUS_SLAVE_ADDRESS)
-	{
-		return PETIT_FALSE_SLAVE_ADDRESS;
-	}
-
-	if (PetitBufI > 6 && PetitExpectedReceiveCount == 0)
-	{
-		if (PetitBuffer[PETIT_BUF_FN_CODE_I] >= 0x01
-				&& PetitBuffer[PETIT_BUF_FN_CODE_I] <= 0x06)  // RHR
-		{
-			PetitExpectedReceiveCount = 8;
-		}
-		else if (PetitBuffer[PETIT_BUF_FN_CODE_I] == 0x0F
-				|| PetitBuffer[PETIT_BUF_FN_CODE_I] == 0x10)
-		{
-			PetitExpectedReceiveCount = PetitBuffer[PETIT_BUF_BYTE_CNT_I] + 9;
-			if (PetitExpectedReceiveCount > PETITMODBUS_RXTX_BUFFER_SIZE)
-			{
-				return PETIT_FALSE_FUNCTION;
-			}
-		}
-		else
-		{
-			return PETIT_FALSE_FUNCTION;
-		}
-	}
-
-	if (PetitExpectedReceiveCount
-			&& PetitBufI >= PetitExpectedReceiveCount)
-	{
-		return PETIT_DATA_READY;
-	}
-
-	return PETIT_DATA_NOT_READY;
-}
 
 /******************************************************************************/
 
