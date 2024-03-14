@@ -60,13 +60,13 @@ extern pb_t PetitPortCoilWrite(pu16_t Addr, pu16_t Data);
 
 #if defined(PETIT_REG) && \
 	(PETIT_REG == PETIT_EXTERNAL || PETIT_REG == PETIT_BOTH)
-extern pb_t PetitPortRegRead(pu8_t Addr, pu16_t* Data);
-extern pb_t PetitPortRegWrite(pu8_t Addr, pu16_t Data);
+extern pb_t PetitPortRegRead(pu16_t Addr, pu16_t* Data);
+extern pb_t PetitPortRegWrite(pu16_t Addr, pu16_t Data);
 #endif
 #if defined(PETIT_INPUT_REG) && \
 	(PETIT_INPUT_REG == PETIT_EXTERNAL || \
 			PETIT_INPUT_REG == PETIT_BOTH)
-extern pb_t PetitPortInputRegRead(pu8_t Addr, pu16_t* Data);
+extern pb_t PetitPortInputRegRead(pu16_t Addr, pu16_t* Data);
 #endif
 #if !defined(PETIT_USER_LED) || PETIT_USER_LED == PETIT_USER_LED_NONE
 #define PetitLedSuc()
