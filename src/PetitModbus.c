@@ -7,14 +7,14 @@
 #include "PetitModbus.h"
 
 /*******************************ModBus Functions*******************************/
-#define PETITMODBUS_READ_COILS                  (1)
-#define PETITMODBUS_READ_DISCRETE_INPUTS        (2)
-#define PETITMODBUS_READ_HOLDING_REGISTERS      (3)
-#define PETITMODBUS_READ_INPUT_REGISTERS        (4)
-#define PETITMODBUS_WRITE_SINGLE_COIL           (5)
-#define PETITMODBUS_WRITE_SINGLE_REGISTER       (6)
-#define PETITMODBUS_WRITE_MULTIPLE_COILS        (15)
-#define PETITMODBUS_WRITE_MULTIPLE_REGISTERS    (16)
+#define C_FCODE_READ_COILS                  (1)
+#define C_FCODE_READ_DISCRETE_INPUTS        (2)
+#define C_FCODE_READ_HOLDING_REGISTERS      (3)
+#define C_FCODE_READ_INPUT_REGISTERS        (4)
+#define C_FCODE_WRITE_SINGLE_COIL           (5)
+#define C_FCODE_WRITE_SINGLE_REGISTER       (6)
+#define C_FCODE_WRITE_MULTIPLE_COILS        (15)
+#define C_FCODE_WRITE_MULTIPLE_REGISTERS    (16)
 /****************************End of ModBus Functions***************************/
 
 #define PETIT_FALSE_FUNCTION                    (0)
@@ -37,8 +37,8 @@
 			| (pu16_t) (PetitBuffer[2*(Idx) + 3]))
 
 /**********************Slave Transmit and Receive Variables********************/
-PETIT_RXTX_STATE Petit_RxTx_State = PETIT_RXTX_RX;
-pu8_t PetitBuffer[PETITMODBUS_RXTX_BUFFER_SIZE];
+PETIT_RXTX_STATE Petit_RxTx_State = E_PETIT_RXTX_RX;
+pu8_t PetitBuffer[C_PETITMODBUS_RXTX_BUFFER_SIZE];
 pu16_t Petit_CRC16 = 0xFFFF;
 // of the two, PetitBufI is used more for RX validation and TX
 // PetitBufJ is used more for internal processing
@@ -94,7 +94,7 @@ pu8_t CheckPetitModbusBufferComplete(void)
 				|| PetitBuffer[PETIT_BUF_FN_CODE_I] == 0x10)
 		{
 			PetitExpectedReceiveCount = PetitBuffer[PETIT_BUF_BYTE_CNT_I] + 9;
-			if (PetitExpectedReceiveCount > PETITMODBUS_RXTX_BUFFER_SIZE)
+			if (PetitExpectedReceiveCount > C_PETITMODBUS_RXTX_BUFFER_SIZE)
 			{
 				return PETIT_FALSE_FUNCTION;
 			}
@@ -121,8 +121,8 @@ pu8_t CheckPetitModbusBufferComplete(void)
  */
 pb_t PetitRxBufferInsert(pu8_t rcvd)
 {
-	if (PetitBufI < PETITMODBUS_RXTX_BUFFER_SIZE
-			&& Petit_RxTx_State == PETIT_RXTX_RX)
+	if (PetitBufI < C_PETITMODBUS_RXTX_BUFFER_SIZE
+			&& Petit_RxTx_State == E_PETIT_RXTX_RX)
 	{
 		*Petit_Ptr++ = rcvd;
 		PetitBufI++;
@@ -144,7 +144,7 @@ pb_t PetitRxBufferInsert(pu8_t rcvd)
  */
 pb_t PetitTxBufferPop(pu8_t* tx)
 {
-	if (Petit_RxTx_State == PETIT_RXTX_TX)
+	if (Petit_RxTx_State == E_PETIT_RXTX_TX)
 	{
 		if (PetitBufI != 0)
 		{
@@ -156,7 +156,7 @@ pb_t PetitTxBufferPop(pu8_t* tx)
 		{
 			// transmission complete.  return to receive mode.
 			// the direction pin is handled by the porting code
-			Petit_RxTx_State = PETIT_RXTX_RX;
+			Petit_RxTx_State = E_PETIT_RXTX_RX;
 			Petit_Ptr = &(PetitBuffer[0]);
 			// PetitBufI is already set at 0 at this point
 			PetitLedOff();
@@ -173,14 +173,14 @@ pb_t PetitTxBufferPop(pu8_t* tx)
  * @param[in] Data
  * @note initialize Petit_CRC16 to 0xFFFF beforehand
  */
-#if PETIT_CRC == PETIT_CRC_TABULAR
+#if C_PETIT_CRC == PETIT_CRC_TABULAR
 void Petit_CRC16_Calc(const pu16_t Data)
 {
 	Petit_CRC16 = (Petit_CRC16 >> 8) ^
 			PetitCRCtable[(Petit_CRC16 ^ (Data)) & 0xFF];
 	return;
 }
-#elif PETIT_CRC == PETIT_CRC_BITWISE
+#elif C_PETIT_CRC == PETIT_CRC_BITWISE
 void Petit_CRC16_Calc(const pu16_t Data)
 {
 	pu8_t i;
@@ -194,7 +194,7 @@ void Petit_CRC16_Calc(const pu16_t Data)
             Petit_CRC16 >>= 1;
     }
 }
-#elif PETIT_CRC == PETIT_CRC_EXTERNAL
+#elif C_PETIT_CRC == PETIT_CRC_EXTERNAL
 #define Petit_CRC16_Calc(Data) PetitPortCRC16Calc((Data), &Petit_CRC16)
 #else
 #error "No Valid CRC Algorithm!"
@@ -208,7 +208,7 @@ void Petit_CRC16_Calc(const pu16_t Data)
 pb_t PetitSendMessage(void)
 {
 	PetitBufI = 0;
-	Petit_RxTx_State = PETIT_RXTX_TX_DATABUF;
+	Petit_RxTx_State = E_PETIT_RXTX_TX_DATABUF;
 
 	return true;
 }
@@ -633,7 +633,7 @@ void HandlePetitModbusWriteMultipleRegisters(void)
  * @fn Petit_RxRTU
  * Check for data ready, if it is good return answer
  */
-void Petit_RxRTU(void)
+void rx_rtu(void)
 {
 	pu8_t Petit_i;
 	pu8_t Petit_ReceiveBufferControl = 0;
@@ -659,12 +659,12 @@ void Petit_RxRTU(void)
 						+ 1] << 8)) == Petit_CRC16)
 		{
 			// Valid message!
-			Petit_RxTx_State = PETIT_RXTX_PROCESS;
+			Petit_RxTx_State = E_PETIT_RXTX_PROCESS;
 		}
 		else
 		{
 			PetitLedCrcFail();
-			Petit_RxTx_State = PETIT_RXTX_RX;
+			Petit_RxTx_State = E_PETIT_RXTX_RX;
 		}
 	}
 }
@@ -690,7 +690,7 @@ void Petit_TxRTU(void)
 	Petit_Ptr = &(PetitBuffer[0]);
 
 	Petit_Tx_Delay = 0;
-	Petit_RxTx_State = PETIT_RXTX_TX_DLY;
+	Petit_RxTx_State = E_PETIT_RXTX_TX_DLY;
 }
 
 /**
@@ -699,43 +699,43 @@ void Petit_TxRTU(void)
  * the message is for this node and the length is correct.
  * @note Only use this function if rx is clear for processing
  */
-void Petit_ResponseProcess(void)
+static void response_process(void)
 {
 	// Data is for us but which function?
 	switch (PetitBuffer[PETIT_BUF_FN_CODE_I])
 	{
 #if PETITMODBUS_READ_COILS_ENABLED > 0
-	case PETITMODBUS_READ_COILS:
+	case C_FCODE_READ_COILS:
 		HandlePetitModbusReadCoils();
 		break;
 #endif
 #if PETITMODBUS_READ_HOLDING_REGISTERS_ENABLED > 0
-	case PETITMODBUS_READ_HOLDING_REGISTERS:
+	case C_FCODE_READ_HOLDING_REGISTERS:
 		HandlePetitModbusReadHoldingRegisters();
 		break;
 #endif
 #if PETITMODBUS_READ_INPUT_REGISTERS_ENABLED > 0
-	case PETITMODBUS_READ_INPUT_REGISTERS:
+	case C_FCODE_READ_INPUT_REGISTERS:
 		HandlePetitModbusReadInputRegisters();
 		break;
 #endif
 #if PETITMODBUS_WRITE_SINGLE_COIL_ENABLED > 0
-	case PETITMODBUS_WRITE_SINGLE_COIL:
+	case C_FCODE_WRITE_SINGLE_COIL:
 		HandlePetitModbusWriteSingleCoil();
 		break;
 #endif
 #if PETITMODBUS_WRITE_SINGLE_REGISTER_ENABLED > 0
-	case PETITMODBUS_WRITE_SINGLE_REGISTER:
+	case C_FCODE_WRITE_SINGLE_REGISTER:
 		HandlePetitModbusWriteSingleRegister();
 		break;
 #endif
 #if PETITMODBUS_WRITE_MULTIPLE_COILS_ENABLED > 0
-	case PETITMODBUS_WRITE_MULTIPLE_COILS:
+	case C_FCODE_WRITE_MULTIPLE_COILS:
 		HandlePetitModbusWriteMultipleCoils();
 		break;
 #endif
 #if PETITMODBUS_WRITE_MULTIPLE_REGISTERS_ENABLED > 0
-	case PETITMODBUS_WRITE_MULTIPLE_REGISTERS:
+	case C_FCODE_WRITE_MULTIPLE_REGISTERS:
 		HandlePetitModbusWriteMultipleRegisters();
 		break;
 #endif
@@ -753,19 +753,19 @@ void Petit_ResponseProcess(void)
  * ModBus main core! Call this function into main!
  * @mermaid{ProcessPetitModbus}
  */
-void ProcessPetitModbus(void)
+void PETIT_MODBUS_Process(void)
 {
 	switch (Petit_RxTx_State)
 	{
 #if PETITMODBUS_PROCESS_POSITION >= 1
-	case PETIT_RXTX_PROCESS:
-		Petit_ResponseProcess();
+	case E_PETIT_RXTX_PROCESS:
+		response_process();
 		// no break here.  Position 1 blends processing with TxRTU.
 #endif
-	case PETIT_RXTX_TX_DATABUF: // if the answer is ready, send it
+	case E_PETIT_RXTX_TX_DATABUF: // if the answer is ready, send it
 		Petit_TxRTU();
 		// no break here.  TxRTU always exits in a correct state.
-	case PETIT_RXTX_TX_DLY:
+	case E_PETIT_RXTX_TX_DLY:
 		// process the TX delay
 		if (Petit_Tx_Delay < PETITMODBUS_DLY_TOP)
 		{
@@ -774,22 +774,22 @@ void ProcessPetitModbus(void)
 		else
 		{
 			// print first character to start UART peripheral
-			Petit_RxTx_State = PETIT_RXTX_TX;
+			Petit_RxTx_State = E_PETIT_RXTX_TX;
 			PetitPortTxBegin(*Petit_Ptr++);
 			PetitBufI--;
 		}
 		break;
-	case PETIT_RXTX_TX:
+	case E_PETIT_RXTX_TX:
 		// no work is done here.  wait until transmission completes.
 		break;
 	// position 0 has the RX process on its own.
 #if PETITMODBUS_PROCESS_POSITION <= 0
-	case PETIT_RXTX_PROCESS:
-		Petit_ResponseProcess();
+	case E_PETIT_RXTX_PROCESS:
+		response_process();
 		break;
 #endif
 	default:
-		Petit_RxRTU();
+		rx_rtu();
 		break;
 	}
 }

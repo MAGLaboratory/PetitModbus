@@ -16,25 +16,25 @@
 // sized to hold a write to all registers
 // +2 address; +2 number of registers; +1 number of bytes to follow; +2 CRC16
 // +1 slave address; +1 function
-#define PETITMODBUS_RXTX_BUFFER_SIZE  (2*(NUMBER_OF_REGISTERS_IN_BUFFER) + 9)
+#define C_PETITMODBUS_RXTX_BUFFER_SIZE  (2*(NUMBER_OF_REGISTERS_IN_BUFFER) + 9)
 
-#if PETIT_CRC == PETIT_CRC_TABULAR
+#if C_PETIT_CRC == PETIT_CRC_TABULAR
 extern PETIT_CODE const pu16_t PetitCRCtable[] PETIT_FLASH_ATTR;
 #endif
 
 typedef enum
 {
-    PETIT_RXTX_RX = 0,
-	PETIT_RXTX_PROCESS,
-    PETIT_RXTX_TX_DATABUF,
-	PETIT_RXTX_TX_DLY,
-    PETIT_RXTX_TX,
-    PETIT_RXTX_TIMEOUT
+    E_PETIT_RXTX_RX = 0,
+	E_PETIT_RXTX_PROCESS,
+    E_PETIT_RXTX_TX_DATABUF,
+	E_PETIT_RXTX_TX_DLY,
+    E_PETIT_RXTX_TX,
+    E_PETIT_RXTX_TIMEOUT
 }  PETIT_RXTX_STATE;
 
 extern PETIT_RXTX_STATE Petit_RxTx_State;
 
 // Main Functions
-extern void                  ProcessPetitModbus(void);
+extern void                  PETIT_MODBUS_Process(void);
 
 #endif
