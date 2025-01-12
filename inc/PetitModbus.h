@@ -30,9 +30,15 @@ typedef enum
 	E_PETIT_RXTX_TX_DLY,
     E_PETIT_RXTX_TX,
     E_PETIT_RXTX_TIMEOUT
-}  PETIT_RXTX_STATE;
+}  T_PETIT_XMIT_STATE;
 
-extern PETIT_RXTX_STATE Petit_RxTx_State;
+typedef enum
+{
+	E_PETIT_FALSE_FUNCTION = 0,
+	E_PETIT_FALSE_SLAVE_ADDRESS,
+	E_PETIT_DATA_NOT_READY,
+	E_PETIT_DATA_READY
+} T_PETIT_BUFFER_STATUS;
 
 // Main Functions
 extern void                  PETIT_MODBUS_Process(void);
