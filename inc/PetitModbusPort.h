@@ -20,11 +20,6 @@
 
 // file with user-defined constants
 #include "PetitModbusUserPort.h"
-
-// functions defined by petit modbus
-extern void PetitRxBufferReset(void);
-extern pb_t PetitRxBufferInsert(pu8_t rcvd);
-extern pb_t PetitTxBufferPop(pu8_t* tx);
 /******************************User Content************************************/
 
 // data defined for porting

@@ -40,7 +40,30 @@ typedef enum
 	E_PETIT_DATA_READY
 } T_PETIT_BUFFER_STATUS;
 
+typedef struct
+{
+	T_PETIT_XMIT_STATE Xmit_State;
+	pu8_t Buffer[C_PETITMODBUS_RXTX_BUFFER_SIZE];
+	pu16_t CRC16;
+	pu16_t BufI;
+	pu16_t BufJ;
+	pu8_t *Ptr;
+	pu16_t Tx_Ctr;
+	pu16_t Expected_RX_Cnt;
+	void (*Timer_Start)(void);
+	void (*Timer_Stop)(void);
+	void (*Tx_Begin)(pu8_t);
+} T_PETIT_MODBUS;
+
+// Initialization Function
+void PETIT_MODBUS_Init(T_PETIT_MODBUS *Petit);
+
 // Main Functions
-extern void                  PETIT_MODBUS_Process(void);
+void PETIT_MODBUS_Process(T_PETIT_MODBUS *Petit);
+
+// functions defined by petit modbus
+void PetitRxBufferReset(T_PETIT_MODBUS *Petit);
+pb_t PetitRxBufferInsert(T_PETIT_MODBUS *Petit, pu8_t rcvd);
+pb_t PetitTxBufferPop(T_PETIT_MODBUS *Petit, pu8_t* tx);
 
 #endif
