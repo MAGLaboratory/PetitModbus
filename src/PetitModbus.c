@@ -7,22 +7,22 @@
 #include "PetitModbus.h"
 
 /*******************************ModBus Functions*******************************/
-#define C_FCODE_READ_COILS                  (1)
-#define C_FCODE_READ_DISCRETE_INPUTS        (2)
-#define C_FCODE_READ_HOLDING_REGISTERS      (3)
-#define C_FCODE_READ_INPUT_REGISTERS        (4)
-#define C_FCODE_WRITE_SINGLE_COIL           (5)
-#define C_FCODE_WRITE_SINGLE_REGISTER       (6)
-#define C_FCODE_WRITE_MULTIPLE_COILS        (15)
-#define C_FCODE_WRITE_MULTIPLE_REGISTERS    (16)
+#define C_FCODE_READ_COILS                  (1U)
+#define C_FCODE_READ_DISCRETE_INPUTS        (2U)
+#define C_FCODE_READ_HOLDING_REGISTERS      (3U)
+#define C_FCODE_READ_INPUT_REGISTERS        (4U)
+#define C_FCODE_WRITE_SINGLE_COIL           (5U)
+#define C_FCODE_WRITE_SINGLE_REGISTER       (6U)
+#define C_FCODE_WRITE_MULTIPLE_COILS        (15U)
+#define C_FCODE_WRITE_MULTIPLE_REGISTERS    (16U)
 /****************************End of ModBus Functions***************************/
-#define PETIT_ERROR_CODE_01                     (0x01)                            // Function code is not supported
-#define PETIT_ERROR_CODE_02                     (0x02)                            // Register address is not allowed or write-protected
-#define PETIT_ERROR_CODE_03						(0X03)                            // Third field incorrect
-#define PETIT_ERROR_CODE_04						(0x04)                            // Fourth or subsequent field incorrect
+#define PETIT_ERROR_CODE_01                     (0x01U)                            // Function code is not supported
+#define PETIT_ERROR_CODE_02                     (0x02U)                            // Register address is not allowed or write-protected
+#define PETIT_ERROR_CODE_03						(0X03U)                            // Third field incorrect
+#define PETIT_ERROR_CODE_04						(0x04U)                            // Fourth or subsequent field incorrect
 
-#define PETIT_BUF_FN_CODE_I 					(1)
-#define PETIT_BUF_BYTE_CNT_I                    (6)
+#define C_IBUF_FN_CODE 					(1U)
+#define C_IBUF_BYTE_CNT                    (6U)
 /**
  * This macro extracts the contents of the buffer at index as a 16-bit
  * unsigned integer
@@ -73,7 +73,7 @@ void PetitRxBufferReset(T_PETIT_MODBUS *Petit)
  *			DATA_NOT_READY		If data is not ready
  *			FALSE_FUNCTION		If functions is wrong
  */
-static T_PETIT_BUFFER_STATUS check_buffer_complete(T_PETIT_MODBUS *Petit)
+static T_PETIT_BUFFER_STATUS check_buffer_complete(T_PETIT_MODBUS *const Petit)
 {
 	if (Petit->BufI > 0 && Petit->Buffer[0] != PETITMODBUS_SLAVE_ADDRESS)
 	{
@@ -82,15 +82,15 @@ static T_PETIT_BUFFER_STATUS check_buffer_complete(T_PETIT_MODBUS *Petit)
 
 	if (Petit->BufI > 6 && Petit->Expected_RX_Cnt == 0)
 	{
-		if (Petit->Buffer[PETIT_BUF_FN_CODE_I] >= 0x01U
-				&& Petit->Buffer[PETIT_BUF_FN_CODE_I] <= 0x06U)  // RHR
+		if (Petit->Buffer[C_IBUF_FN_CODE] >= 0x01U
+				&& Petit->Buffer[C_IBUF_FN_CODE] <= 0x06U)  // RHR
 		{
 			Petit->Expected_RX_Cnt = 8U;
 		}
-		else if (Petit->Buffer[PETIT_BUF_FN_CODE_I] == 0x0FU
-				|| Petit->Buffer[PETIT_BUF_FN_CODE_I] == 0x10U)
+		else if (Petit->Buffer[C_IBUF_FN_CODE] == 0x0FU
+				|| Petit->Buffer[C_IBUF_FN_CODE] == 0x10U)
 		{
-			Petit->Expected_RX_Cnt = Petit->Buffer[PETIT_BUF_BYTE_CNT_I] + 9U;
+			Petit->Expected_RX_Cnt = Petit->Buffer[C_IBUF_BYTE_CNT] + 9U;
 			if (Petit->Expected_RX_Cnt > C_PETITMODBUS_RXTX_BUFFER_SIZE)
 			{
 				return E_PETIT_FALSE_FUNCTION;
@@ -123,7 +123,7 @@ pb_t PetitRxBufferInsert(T_PETIT_MODBUS *Petit, pu8_t rcvd)
 		*Petit->Ptr++ = rcvd;
 		Petit->BufI++;
 		Petit->Timer_Start();
-		if (check_buffer_complete(&Petit) == E_PETIT_DATA_READY)
+		if (check_buffer_complete(Petit) == E_PETIT_DATA_READY)
 		{
 			Petit->Timer_Stop();
 		}
@@ -219,7 +219,7 @@ static pb_t prepare_tx(T_PETIT_MODBUS *Petit)
 static void handle_error(T_PETIT_MODBUS *Petit, pu8_t ErrorCode)
 {
 	// Initialise the output buffer. The first byte in the buffer says how many registers we have read
-	Petit->Buffer[PETIT_BUF_FN_CODE_I] |= 0x80U;
+	Petit->Buffer[C_IBUF_FN_CODE] |= 0x80U;
 	Petit->Buffer[2U] = ErrorCode;
 	Petit->BufJ = 3U;
 	PetitLedErrFail();
@@ -526,7 +526,7 @@ static void write_multiple_coils(T_PETIT_MODBUS *Petit)
 	// The message contains the requested start address and number of registers
 	start_coil = PETIT_BUF_DAT_M(0);
 	number_of_coils = PETIT_BUF_DAT_M(1);
-	byte_count = Petit->Buffer[PETIT_BUF_BYTE_CNT_I];
+	byte_count = Petit->Buffer[C_IBUF_BYTE_CNT];
 
 	// If it is bigger than RegisterNumber return error to Modbus Master
 	if ((start_coil + number_of_coils)
@@ -587,7 +587,7 @@ static void write_multiple_registers(T_PETIT_MODBUS *Petit)
 	// The message contains the requested start address and number of registers
 	start_address = PETIT_BUF_DAT_M(0);
 	num_registers = PETIT_BUF_DAT_M(1);
-	byte_count = Petit->Buffer[PETIT_BUF_BYTE_CNT_I];
+	byte_count = Petit->Buffer[C_IBUF_BYTE_CNT];
 
 	// If it is bigger than RegisterNumber return error to Modbus Master
 	if ((start_address + num_registers)
@@ -699,7 +699,7 @@ static void tx_rtu(T_PETIT_MODBUS *Petit)
 static void response_process(T_PETIT_MODBUS *Petit)
 {
 	// Data is for us but which function?
-	switch (Petit->Buffer[PETIT_BUF_FN_CODE_I])
+	switch (Petit->Buffer[C_IBUF_FN_CODE])
 	{
 #if PETITMODBUS_READ_COILS_ENABLED > 0
 	case C_FCODE_READ_COILS:
@@ -761,7 +761,7 @@ void PETIT_MODBUS_Process(T_PETIT_MODBUS *Petit)
 #endif
 	case E_PETIT_RXTX_TX_DATABUF: // if the answer is ready, send it
 		tx_rtu(Petit);
-		// no break here.  TxRTU always exits in a correct state.
+		// fall through
 	case E_PETIT_RXTX_TX_DLY:
 		// process the TX delay
 		if (Petit->Tx_Ctr < PETITMODBUS_DLY_TOP)
