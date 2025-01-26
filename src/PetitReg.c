@@ -15,7 +15,12 @@
 pu8_t PetitCoils           [(NUMBER_OF_PETITCOILS + 7) >> 3];
 #endif
 #endif
-
+#if defined(NUMBER_OF_PETITDISCRETES) && NUMBER_OF_PETITDISCRETES > 0
+#if defined(PETIT_DISCRETE) && \
+	(PETIT_DISCRETE == PETIT_INTERNAL || PETTI_DISCRETE == PETIT_BOTH)
+pu8_t PetitDiscretes           [(NUMBER_OF_PETITDISCRETES + 7) >> 3];
+#endif
+#endif
 #if defined(NUMBER_OF_PETITREGISTERS) && NUMBER_OF_PETITREGISTERS > 0
 #if defined(PETIT_REG) && \
 	(PETIT_REG == PETIT_INTERNAL || PETIT_REG == PETIT_BOTH)

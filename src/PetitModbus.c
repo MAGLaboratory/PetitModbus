@@ -301,6 +301,140 @@ static void read_coils(T_PETIT_MODBUS *Petit)
 }
 #endif /* PETITMODBUS_READ_COILS_ENABLED */
 
+/******************************************************************************/
+/**
+ * @fn read_discretes
+ * Modbus function 02 - Read Discrete
+ */
+#if PETITMODBUS_READ_DISCRETES_ENABLED != 0
+static void read_discretes(T_PETIT_MODBUS *Petit)
+{
+	pu16_t start_discrete = 0;
+	pu16_t number_of_discretes = 0;
+	pu16_t i = 0;
+
+	// The message contains the requested start address and number of registers
+	start_discrete = PETIT_BUF_DAT_M(0);
+	number_of_discretes = PETIT_BUF_DAT_M(1);
+
+	// If it is bigger than RegisterNumber return error to Modbus Master
+	// there is an interesting calculation done with the number of coils here
+	// since the first coil in a byte starts a new byte, we add seven to the
+	// number of coils.
+	// the left shift by three is a method of dividing by eight (2^3) without
+	// specifically using the divide function because divisions are expensive
+	// the number of registers in buffer are multiplied by two since each
+	// register in modbus is 16 bits
+	if ((start_discrete + number_of_discretes)
+			> NUMBER_OF_PETITDISCRETES ||
+			(number_of_discretes + 7) >> 3 > NUMBER_OF_REGISTERS_IN_BUFFER * 2 ||
+			number_of_discretes == 0)
+	{
+		handle_error(Petit, PETIT_ERROR_CODE_02);
+	}
+	else
+	{
+		pu8_t data = 0;
+		// Initialize the output buffer.
+		// The first byte in the PDU says how many bytes are in response
+		Petit->BufJ = 2U; // at least three bytes are in response.
+					   // set less here to accommodate the following loop
+		Petit->Buffer[2U] = 0;
+
+		for (i = 0; i < number_of_discretes; i++)
+		{
+			pu8_t bit;
+			if ((i & 7U) == 0)
+			{
+				Petit->Buffer[Petit->BufJ++] = data;
+				data = 0;
+			}
+#if defined(PETIT_DISCRETE) && \
+	(PETIT_DISCRETE == PETIT_INTERNAL || PETIT_DISCRETE == PETIT_BOTH)
+			// test the current coil bit
+			bit =
+					(PetitDiscretes[(start_discrete + i) >> 3]
+					& 1 << ((start_discrete + i) & 7)) != 0;
+			data |= (pu8_t) bit << (i & 7);
+#endif
+#if defined(PETIT_DISCRETE) && \
+	(PETIT_DISCRETE == PETIT_EXTERNAL || PETIT_DISCRETE == PETIT_BOTH)
+			if (!PetitPortDiscreteRead(start_discrete + Petit_i,
+					&bit))
+			{
+				handle_error(PETIT_ERROR_CODE_04);
+				return;
+			}
+			data |= (pu8_t) (bit != 0) << (i & 7U);
+#endif
+		}
+		Petit->Buffer[Petit->BufJ++] = data;
+		Petit->Buffer[2U] = Petit->BufJ - 3U;
+		PetitLedSuc();
+		prepare_tx(Petit);
+	}
+}
+#endif /* PETITMODBUS_READ_DISCRETES_ENABLED */
+
+/**
+ * @fn HandlePetitModbusReadHoldingRegisters
+ * Modbus function 03 - Read holding registers
+ */
+#if PETITMODBUS_READ_HOLDING_REGISTERS_ENABLED != 0
+static void read_holding_registers(T_PETIT_MODBUS *Petit)
+{
+	// Holding registers are effectively numerical outputs that can be written to by the host.
+	// They can be control registers or analogue outputs.
+	// We potentially have one - the pwm output value
+	pu16_t start_address = 0;
+	pu16_t number_of_registers = 0;
+	pu16_t i = 0;
+
+	// The message contains the requested start address and number of registers
+	start_address = PETIT_BUF_DAT_M(0);
+	number_of_registers = PETIT_BUF_DAT_M(1);
+
+	// If it is bigger than RegisterNumber return error to Modbus Master
+	if ((start_address + number_of_registers)
+			> NUMBER_OF_PETITREGISTERS ||
+			number_of_registers > NUMBER_OF_REGISTERS_IN_BUFFER)
+		handle_error(Petit, PETIT_ERROR_CODE_02);
+	else
+	{
+		// Initialise the output buffer.
+		// The first byte in the PDU says how many registers we have read
+		Petit->BufJ = 3U;
+		Petit->Buffer[2U] = 0;
+
+		for (i = 0; i < number_of_registers; i++)
+		{
+			pu16_t Petit_CurrentData;
+#if defined(PETIT_REG) && \
+	(PETIT_REG == PETIT_INTERNAL || PETIT_REG == PETIT_BOTH)
+			Petit_CurrentData = PetitRegisters[start_address
+					+ i];
+#endif
+#if defined(PETIT_REG) && \
+	(PETIT_REG == PETIT_EXTERNAL || PETIT_REG == PETIT_BOTH)
+			if (!PetitPortRegRead(start_address + i, &Petit_CurrentData))
+			{
+				handle_error(Petit, PETIT_ERROR_CODE_04);
+				return;
+			}
+#endif
+			Petit->Buffer[Petit->BufJ] =
+					(pu8_t) ((Petit_CurrentData & 0xFF00U) >> 8U);
+			Petit->Buffer[Petit->BufJ + 1U] =
+					(pu8_t) (Petit_CurrentData & 0xFFU);
+			Petit->BufJ += 2U;
+		}
+		Petit->Buffer[2U] = Petit->BufJ - 3U;
+		PetitLedSuc();
+		prepare_tx(Petit);
+	}
+}
+#endif /* PETITMODBUS_READ_HOLDING_REGISTERS_ENABLED */
+
 /**
  * @fn HandlePetitModbusReadHoldingRegisters
  * Modbus function 03 - Read holding registers
@@ -706,6 +840,11 @@ static void response_process(T_PETIT_MODBUS *Petit)
 		read_coils(Petit);
 		break;
 #endif
+#if PETITMODBUS_READ_DISCRETES_ENABLED > 0
+	case C_FCODE_READ_DISCRETES:
+		read_discretes(Petit);
+		break;
+#endif
 #if PETITMODBUS_READ_HOLDING_REGISTERS_ENABLED > 0
 	case C_FCODE_READ_HOLDING_REGISTERS:
 		read_holding_registers(Petit);
@@ -795,6 +934,11 @@ void PETIT_MODBUS_Process(T_PETIT_MODBUS *Petit)
 #if !defined(PETIT_COIL) || (PETIT_COIL != PETIT_INTERNAL && \
 		PETIT_COIL != PETIT_BOTH && PETIT_COIL != PETIT_EXTERNAL)
 #error "PETIT_COIL not defined or not valid."
+#endif
+
+#if !defined(PETIT_DISCRETE) || (PETIT_DISCRETE != PETIT_INTERNAL && \
+		PETIT_DISCRETE != PETIT_BOTH && PETIT_COIL != PETIT_EXTERNAL)
+#error "PETIT_DISCRETE not defined or not valid."
 #endif
 
 #if !defined(PETIT_REG) || (PETIT_REG != PETIT_INTERNAL && \
