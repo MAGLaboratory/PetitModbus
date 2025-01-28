@@ -8,7 +8,7 @@
 
 /*******************************ModBus Functions*******************************/
 #define C_FCODE_READ_COILS                  (1U)
-#define C_FCODE_READ_DISCRETE_INPUTS        (2U)
+#define C_FCODE_READ_DISCRETES              (2U)
 #define C_FCODE_READ_HOLDING_REGISTERS      (3U)
 #define C_FCODE_READ_INPUT_REGISTERS        (4U)
 #define C_FCODE_WRITE_SINGLE_COIL           (5U)
@@ -375,65 +375,6 @@ static void read_discretes(T_PETIT_MODBUS *Petit)
 	}
 }
 #endif /* PETITMODBUS_READ_DISCRETES_ENABLED */
-
-/**
- * @fn HandlePetitModbusReadHoldingRegisters
- * Modbus function 03 - Read holding registers
- */
-#if PETITMODBUS_READ_HOLDING_REGISTERS_ENABLED != 0
-static void read_holding_registers(T_PETIT_MODBUS *Petit)
-{
-	// Holding registers are effectively numerical outputs that can be written to by the host.
-	// They can be control registers or analogue outputs.
-	// We potentially have one - the pwm output value
-	pu16_t start_address = 0;
-	pu16_t number_of_registers = 0;
-	pu16_t i = 0;
-
-	// The message contains the requested start address and number of registers
-	start_address = PETIT_BUF_DAT_M(0);
-	number_of_registers = PETIT_BUF_DAT_M(1);
-
-	// If it is bigger than RegisterNumber return error to Modbus Master
-	if ((start_address + number_of_registers)
-			> NUMBER_OF_PETITREGISTERS ||
-			number_of_registers > NUMBER_OF_REGISTERS_IN_BUFFER)
-		handle_error(Petit, PETIT_ERROR_CODE_02);
-	else
-	{
-		// Initialise the output buffer.
-		// The first byte in the PDU says how many registers we have read
-		Petit->BufJ = 3U;
-		Petit->Buffer[2U] = 0;
-
-		for (i = 0; i < number_of_registers; i++)
-		{
-			pu16_t Petit_CurrentData;
-#if defined(PETIT_REG) && \
-	(PETIT_REG == PETIT_INTERNAL || PETIT_REG == PETIT_BOTH)
-			Petit_CurrentData = PetitRegisters[start_address
-					+ i];
-#endif
-#if defined(PETIT_REG) && \
-	(PETIT_REG == PETIT_EXTERNAL || PETIT_REG == PETIT_BOTH)
-			if (!PetitPortRegRead(start_address + i, &Petit_CurrentData))
-			{
-				handle_error(Petit, PETIT_ERROR_CODE_04);
-				return;
-			}
-#endif
-			Petit->Buffer[Petit->BufJ] =
-					(pu8_t) ((Petit_CurrentData & 0xFF00U) >> 8U);
-			Petit->Buffer[Petit->BufJ + 1U] =
-					(pu8_t) (Petit_CurrentData & 0xFFU);
-			Petit->BufJ += 2U;
-		}
-		Petit->Buffer[2U] = Petit->BufJ - 3U;
-		PetitLedSuc();
-		prepare_tx(Petit);
-	}
-}
-#endif /* PETITMODBUS_READ_HOLDING_REGISTERS_ENABLED */
 
 /**
  * @fn HandlePetitModbusReadHoldingRegisters

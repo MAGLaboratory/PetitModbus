@@ -41,7 +41,7 @@ pu16_t PetitInputRegisters [NUMBER_OF_INPUT_PETITREGISTERS];
 #error "Could not determine number of coils."
 #endif
 
-#if !defined(NUMBER_OF_DISCRETE_PETITINPUTS) || !defined(PETIT_DISCRETE_INPUT)
+#if !defined(NUMBER_OF_PETITDISCRETES) || !defined(PETIT_DISCRETE)
 #error "Could not determine number of discrete inputs."
 #endif
 
