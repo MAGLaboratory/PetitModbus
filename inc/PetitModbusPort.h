@@ -52,9 +52,14 @@ extern void PetitPortCRC16Calc(pu8_t Data, pu16_t* CRC);
 #endif
 
 #if defined(PETIT_COIL) && \
-	(PETIT_COIL == PETIT_EXTERNAL || PETIT_REG == PETIT_BOTH)
+	(PETIT_COIL == PETIT_EXTERNAL || PETIT_COIL == PETIT_BOTH)
 extern pb_t PetitPortCoilRead(pu16_t Addr, pu8_t* Data);
-extern pb_t PetitPortCoilWrite(pu16_t Addr, pu16_t Data);
+extern pb_t PetitPortCoilWrite(pu16_t Addr, pu8_t Data);
+#endif
+
+#if defined(PETIT_DISCRETE) && \
+	(PETIT_DISCRETE == PETIT_EXTERNAL || PETIT_DISCRETE == PETIT_BOTH)
+extern pb_t PetitPortDiscreteRead(pu16_t Addr, pu8_t* Data);
 #endif
 
 #if defined(PETIT_REG) && \
