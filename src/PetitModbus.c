@@ -284,10 +284,9 @@ static void read_coils(T_PETIT_MODBUS *Petit)
 #endif
 #if defined(PETIT_COIL) && \
 	(PETIT_COIL == PETIT_EXTERNAL || PETIT_COIL == PETIT_BOTH)
-			if (!PetitPortCoilRead(start_coil + Petit_i,
-					&bit))
+			if (!PetitPortCoilRead(start_coil + i, &bit))
 			{
-				handle_error(PETIT_ERROR_CODE_04);
+				handle_error(Petit, PETIT_ERROR_CODE_04);
 				return;
 			}
 			data |= (pu8_t) (bit != 0) << (i & 7U);
@@ -359,10 +358,9 @@ static void read_discretes(T_PETIT_MODBUS *Petit)
 #endif
 #if defined(PETIT_DISCRETE) && \
 	(PETIT_DISCRETE == PETIT_EXTERNAL || PETIT_DISCRETE == PETIT_BOTH)
-			if (!PetitPortDiscreteRead(start_discrete + Petit_i,
-					&bit))
+			if (!PetitPortDiscreteRead(start_discrete + i, &bit))
 			{
-				handle_error(PETIT_ERROR_CODE_04);
+				handle_error(Petit, PETIT_ERROR_CODE_04);
 				return;
 			}
 			data |= (pu8_t) (bit != 0) << (i & 7U);
@@ -529,7 +527,7 @@ static void write_single_coil(T_PETIT_MODBUS *Petit)
 	(PETIT_COIL == PETIT_EXTERNAL || PETIT_COIL == PETIT_BOTH)
 		if(!PetitPortCoilWrite(address, value))
 		{
-			handle_error(PETIT_ERROR_CODE_04);
+			handle_error(Petit, PETIT_ERROR_CODE_04);
 			return;
 		}
 #endif
@@ -634,7 +632,7 @@ static void write_multiple_coils(T_PETIT_MODBUS *Petit)
 		( PETIT_COIL == PETIT_EXTERNAL || PETIT_COIL == PETIT_BOTH)
 			if (!PetitPortCoilWrite(start_coil + i, current_bit))
 			{
-				handle_error(PETIT_ERROR_CODE_04);
+				handle_error(Petit, PETIT_ERROR_CODE_04);
 				return;
 			}
 #endif
