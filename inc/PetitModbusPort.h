@@ -25,11 +25,11 @@
 // data defined for porting
 #if defined(PETIT_COIL) && \
 	(PETIT_COIL == PETIT_INTERNAL || PETIT_COIL == PETIT_BOTH)
-	pu8_t PetitCoils[(NUMBER_OF_PETITCOILS + 7) >> 3];
+extern pu8_t PetitCoils[(NUMBER_OF_PETITCOILS + 7) >> 3];
 #endif
 #if defined(PETIT_DISCRETE) && \
 	(PETIT_DISCRETE == PETIT_INTERNAL || PETIT_DISCRETE == PETIT_BOTH)
-	pu8_t PetitDiscretes[(NUMBER_OF_PETITDISCRETES + 7) >> 3];
+extern pu8_t PetitDiscretes[(NUMBER_OF_PETITDISCRETES + 7) >> 3];
 #endif
 #if defined(PETIT_REG) && \
 	(PETIT_REG == PETIT_INTERNAL || PETIT_REG == PETIT_BOTH)
