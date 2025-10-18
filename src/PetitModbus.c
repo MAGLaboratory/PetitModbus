@@ -712,7 +712,7 @@ static void rx_rtu(T_PETIT_MODBUS *Petit)
 	if (buf_stat == E_PETIT_DATA_READY)
 	{
 		// disable timeout
-		PetitPortTimerStop();
+		Petit->Timer_Stop();
 
 		// CRC calculate
 		Petit->CRC16 = 0xFFFF;
