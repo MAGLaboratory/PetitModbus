@@ -43,10 +43,6 @@ extern pu8_t PetitRegChange;
 extern pu16_t PetitInputRegisters[NUMBER_OF_INPUT_PETITREGISTERS];
 #endif
 
-// functions to be defined for porting
-extern void PetitPortTxBegin(pu8_t tx);
-extern void PetitPortTimerStart(void);
-extern void PetitPortTimerStop(void);
 #if defined(PETIT_CRC) && PETIT_CRC == PETIT_CRC_EXTERNAL
 extern void PetitPortCRC16Calc(pu8_t Data, pu16_t* CRC);
 #endif
