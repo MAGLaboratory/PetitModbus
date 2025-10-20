@@ -25,6 +25,26 @@ An include file called `PetitModbusUserPort.h` and a source file called
   - Nuvoton MCUs
   - Texas DSP
 
+### Implementation Notes
+Tick timer functions can be implemented using a single timer at 250 us and
+performing the timer action after +1 cycles after the normal timer expiration.
+After the maximum inter word transmission period, the buffer should be cleared
+if the RS485 line is not idle.
+
+Communications functions include a direction change function if your hardware
+does not support a direction pin.
+The RX buffer transfer is relatively simple, and the inter word timer was
+covered in the previous section.
+The TX buffer transfer can be implemented on either interface buffer empty or
+interface TX complete with caveats on how direction change is implemented.
+If the TX buffer transfer is implemented on TX complete, the direction change
+can be performed when `PetitTxBufferPop()` reports an empty TX buffer.
+If the TX buffer transfer is implemented on interface buffer empty, the
+direction change should first check if the buffer has completed transmission.
+This can be accomplished through checking the status of the RXTX state
+machine, `.Xmit_State` which is set to `E_PETIT_RXTX_RX` when transmission
+completes.
+
 ## License
   It's free to use with non-commercial projects.            
  
