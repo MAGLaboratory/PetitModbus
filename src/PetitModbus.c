@@ -735,6 +735,7 @@ static void rx_rtu(T_PETIT_MODBUS *Petit)
 		{
 			PetitLedCrcFail();
 			Petit->Xmit_State = E_PETIT_RXTX_RX;
+			PetitRxBufferReset(Petit);
 		}
 	}
 }
